@@ -332,8 +332,40 @@
     }
     .action-bar .spm-btn { flex: 1; min-width: 140px; }
 
-    /* ── Loading ──────────────────────────────────────────────────── */
+    /* ── Loading Modal ────────────────────────────────────────────── */
     .loading { text-align: center; padding: 40px; color: var(--muted); }
+    .loading-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .loading-modal.active { display: flex; }
+    .loading-modal-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px 40px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border);
+      border-top-color: var(--spm-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-modal-text {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
 
     /* ── Utility ──────────────────────────────────────────────────── */
     .hidden { display: none !important; }
@@ -412,6 +444,14 @@
   <div class="spm-footer">South Portland Metro APA &middot; RollCall</div>
 </div>
 
+<!-- ═══ Loading Modal (overlay) ═══ -->
+<div class="loading-modal" id="loadingModal">
+  <div class="loading-modal-box">
+    <div class="loading-spinner"></div>
+    <div class="loading-modal-text" id="loadingModalText">Looking up...</div>
+  </div>
+</div>
+
 <!-- ═══ Shared Core ═══ -->
 <script>
   window.SPM_CONFIG = {
@@ -446,6 +486,25 @@ var currentFormIsReReg = false;
 var currentFormOrigTeam = '';
 var currentFormIsDj = false;
 
+// ── Short time display ─────────────────────────────────────────────
+// "6:30 PM" → "6:30p", "12:00 PM" → "12p", "1:00 PM" → "1p"
+function shortTimeStr(t) {
+  if (!t) return '';
+  var m = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return t;
+  var hr = m[1], min = m[2], ampm = m[3].toLowerCase().charAt(0);
+  return min === '00' ? hr + ampm : hr + ':' + min + ampm;
+}
+
+// ── Loading modal ──────────────────────────────────────────────────
+function showLoading(text) {
+  document.getElementById('loadingModalText').textContent = text || 'Loading...';
+  document.getElementById('loadingModal').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingModal').classList.remove('active');
+}
+
 // ── Screen navigation ──────────────────────────────────────────────
 function showScreen(id) {
   var screens = ['screenAuth', 'screenDashboard', 'screenRegForm', 'screenConfirm', 'screenRequest'];
@@ -464,15 +523,16 @@ function doLookup() {
     return;
   }
   document.getElementById('authError').textContent = '';
-  SPM.setStatus('Looking up...');
+  showLoading('Looking up your teams...');
 
   SPM.callServer('lookupPlayer', { input: input }).then(function(data) {
-    SPM.setStatus('');
     if (!data.success) {
+      hideLoading();
       document.getElementById('authError').textContent = data.error || 'Lookup failed.';
       return;
     }
     if (!data.found) {
+      hideLoading();
       document.getElementById('authError').textContent = data.message || 'Not found.';
       return;
     }
@@ -484,12 +544,13 @@ function doLookup() {
 
     // Fetch available divisions in parallel
     SPM.callServer('getAvailableDivisions').then(function(divData) {
+      hideLoading();
       availableDivisions = (divData.success && divData.divisions) ? divData.divisions : [];
       renderDashboard();
       showScreen('screenDashboard');
     });
   }).catch(function(err) {
-    SPM.setStatus('');
+    hideLoading();
     document.getElementById('authError').textContent = 'Network error. Please try again.';
   });
 }
@@ -639,17 +700,16 @@ function buildRosterSummary(roster) {
 function cancelReg(regId) {
   if (!confirm('Cancel this registration?')) return;
 
-  SPM.setStatus('Cancelling...');
+  showLoading('Cancelling...');
   SPM.callServer('cancelRegistration', {
     registrationId: regId,
     memberNumber: currentPlayer.memberNumber
   }).then(function(data) {
-    SPM.setStatus('');
+    hideLoading();
     if (!data.success) { alert(data.error || 'Cancel failed.'); return; }
-    // Refresh
     doLookup();
   }).catch(function() {
-    SPM.setStatus('');
+    hideLoading();
     alert('Network error.');
   });
 }
@@ -769,7 +829,8 @@ function renderRegForm(opts) {
   for (var dt = 0; dt < dtKeys.length; dt++) {
     var combo = byDayTime[dtKeys[dt]];
     var fmtList = Object.keys(combo.formats).sort().join(', ');
-    var label = combo.day + ' ' + combo.time + ' (' + fmtList + ')';
+    var shortTime = shortTimeStr(combo.time);
+    var label = combo.day + ' ' + shortTime + ' (' + fmtList + ')';
     var optVal = combo.day + '|' + combo.time;
     var sel = (optVal === preselValue) ? ' selected' : '';
     html += '<option value="' + esc(optVal) + '"' + sel + '>' + esc(label) + '</option>';
@@ -1078,11 +1139,11 @@ function submitRegistration() {
     payload.roster = currentRoster;
   }
 
-  SPM.setStatus('Submitting registration...');
+  showLoading('Submitting registration...');
   document.getElementById('submitRegBtn').disabled = true;
 
   SPM.callServer('registerTeam', payload).then(function(data) {
-    SPM.setStatus('');
+    hideLoading();
     document.getElementById('submitRegBtn').disabled = false;
 
     if (!data.success) {
@@ -1092,7 +1153,7 @@ function submitRegistration() {
 
     showConfirmation(data);
   }).catch(function() {
-    SPM.setStatus('');
+    hideLoading();
     document.getElementById('submitRegBtn').disabled = false;
     alert('Network error. Please try again.');
   });
