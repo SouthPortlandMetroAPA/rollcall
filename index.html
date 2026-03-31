@@ -63,20 +63,30 @@
     }
 
     /* ── Team Cards ───────────────────────────────────────────────── */
+    .teams-grid {
+      display: grid;
+      gap: 12px;
+    }
+    @media (min-width: 768px) {
+      .teams-grid { grid-template-columns: repeat(2, 1fr); }
+    }
     .team-card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 16px;
-      margin-bottom: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    @media (hover: hover) {
+      .team-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
     }
     .team-card-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 8px;
-      margin-bottom: 8px;
     }
     .team-card-name {
       font-size: 1.05rem;
@@ -85,14 +95,8 @@
     .team-card-meta {
       font-size: 0.85rem;
       color: var(--muted);
-      margin-bottom: 8px;
+      margin-top: 4px;
     }
-    .team-card-roster {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
-    .team-card-roster .captain { font-weight: 600; color: var(--text); }
     .badge-registered {
       background: #d4edda;
       color: #155724;
@@ -110,11 +114,29 @@
       font-weight: 700;
       letter-spacing: 0.04em;
     }
-    .dj-sub {
+
+    /* ── Team Detail (expanded view) ─────────────────────────────── */
+    .team-detail {
+      display: none;
+      margin-top: 12px;
       border-top: 1px solid var(--border);
-      padding-top: 8px;
-      margin-top: 8px;
+      padding-top: 12px;
     }
+    .team-detail.open { display: block; }
+    .team-card-roster {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .team-card-roster .captain { font-weight: 600; color: var(--text); }
+    .dj-columns {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 768px) {
+      .dj-columns { grid-template-columns: 1fr 1fr; }
+    }
+    .dj-sub {}
     .dj-sub-label {
       font-size: 0.8rem;
       font-weight: 700;
@@ -149,6 +171,13 @@
     }
 
     /* ── Roster Builder ───────────────────────────────────────────── */
+    .roster-columns {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 768px) {
+      .roster-columns { grid-template-columns: 1fr 1fr; }
+    }
     .roster-section { margin-bottom: 20px; }
     .roster-section-title {
       font-weight: 700;
@@ -468,15 +497,17 @@ function renderDashboard() {
     dashBtns.classList.remove('hidden');
   }
 
-  // Team cards
+  // Team cards — compact by default, click to expand
   var teamsHtml = '<div class="section-title">Your Current Teams</div>';
 
   if (currentTeams.length === 0) {
     teamsHtml += '<div class="spm-card not-found-card">You are not on any teams this session.</div>';
-  }
-
-  for (var i = 0; i < currentTeams.length; i++) {
-    teamsHtml += buildTeamCard(currentTeams[i], i);
+  } else {
+    teamsHtml += '<div class="teams-grid">';
+    for (var i = 0; i < currentTeams.length; i++) {
+      teamsHtml += buildTeamCard(currentTeams[i], i);
+    }
+    teamsHtml += '</div>';
   }
 
   document.getElementById('teamsArea').innerHTML = teamsHtml;
@@ -484,11 +515,13 @@ function renderDashboard() {
 
 function buildTeamCard(team, index) {
   var esc = SPM.esc;
-  var html = '<div class="team-card">';
+  var isRegistered = !!team.registrationStatus;
 
-  // Header row
+  // Compact card — click to expand detail
+  var html = '<div class="team-card" onclick="toggleDetail(' + index + ')">';
+
+  // Header row: name + status badge
   html += '<div class="team-card-header">';
-
   if (team.isDjPair) {
     html += '<div>';
     html += '<span class="dj-label">DJ</span> ';
@@ -497,48 +530,61 @@ function buildTeamCard(team, index) {
   } else {
     html += '<span class="team-card-name">' + esc(team.teamName) + '</span>';
   }
-
-  // Status badge
-  var isRegistered = !!team.registrationStatus;
   html += '<span class="spm-badge ' + (isRegistered ? 'badge-registered' : 'badge-not-registered') + '">' +
     (isRegistered ? 'Registered' : 'Not Registered') + '</span>';
   html += '</div>';
 
+  // Compact meta line (always visible)
   if (team.isDjPair) {
-    // Meta
+    var rosterCount = team.eightBallTeam.roster.length + team.nineBallTeam.roster.length;
     html += '<div class="team-card-meta">' + esc(team.day) + ' &middot; ' +
-      esc(team.eightBallTeam.venue || team.nineBallTeam.venue) + '</div>';
+      esc(team.eightBallTeam.venue || team.nineBallTeam.venue) +
+      ' &middot; ' + rosterCount + ' players</div>';
+  } else {
+    html += '<div class="team-card-meta">#' + esc(team.teamNumber) + ' &middot; ' +
+      esc(team.day) + ' &middot; ' + esc(team.format) +
+      ' &middot; ' + team.roster.length + ' players</div>';
+  }
 
-    // 8-ball sub
+  // Expandable detail section
+  html += '<div class="team-detail" id="detail-' + index + '">';
+
+  if (team.isDjPair) {
+    // DJ rosters side by side on desktop, stacked on mobile
+    html += '<div class="dj-columns">';
     html += '<div class="dj-sub">';
     html += '<div class="dj-sub-label">8-Ball &middot; Team #' + esc(team.eightBallTeam.teamNumber) + '</div>';
     html += buildRosterSummary(team.eightBallTeam.roster);
     html += '</div>';
-
-    // 9-ball sub
     html += '<div class="dj-sub">';
     html += '<div class="dj-sub-label">9-Ball &middot; Team #' + esc(team.nineBallTeam.teamNumber) + '</div>';
     html += buildRosterSummary(team.nineBallTeam.roster);
     html += '</div>';
+    html += '</div>';
   } else {
-    html += '<div class="team-card-meta">Team #' + esc(team.teamNumber) + ' &middot; ' +
-      esc(team.day) + ' &middot; ' + esc(team.format) + ' &middot; ' + esc(team.venue) + '</div>';
+    html += '<div class="team-card-meta">' + esc(team.venue) + '</div>';
     html += buildRosterSummary(team.roster);
   }
 
-  // Action buttons
+  // Action buttons (inside detail)
   if (registrationOpen && team.canRegister && !isRegistered) {
     html += '<div class="action-bar">';
-    html += '<button class="spm-btn spm-btn-primary" onclick="startReRegister(' + index + ')">Re-Register This Team</button>';
+    html += '<button class="spm-btn spm-btn-primary" onclick="event.stopPropagation();startReRegister(' + index + ')">Re-Register This Team</button>';
     html += '</div>';
   } else if (registrationOpen && isRegistered) {
     html += '<div class="action-bar">';
-    html += '<button class="spm-btn spm-btn-danger" onclick="cancelReg(\'' + esc(team.registrationId || team.djPairId || '') + '\')">Cancel Registration</button>';
+    html += '<button class="spm-btn spm-btn-danger" onclick="event.stopPropagation();cancelReg(\'' + esc(team.registrationId || team.djPairId || '') + '\')">Cancel Registration</button>';
     html += '</div>';
   }
 
-  html += '</div>';
+  html += '</div>'; // end detail
+  html += '</div>'; // end card
   return html;
+}
+
+function toggleDetail(index) {
+  var el = document.getElementById('detail-' + index);
+  if (el) el.classList.toggle('open');
 }
 
 function buildRosterSummary(roster) {
@@ -728,8 +774,11 @@ function renderRosterArea() {
   var html = '';
 
   if (currentFormIsDj) {
+    // Side by side on desktop, stacked on mobile
+    html += '<div class="roster-columns">';
     html += buildRosterSection('8-Ball Roster', currentRoster8, '8');
     html += buildRosterSection('9-Ball Roster', currentRoster9, '9');
+    html += '</div>';
   } else {
     html += buildRosterSection('Roster', currentRoster, '');
   }
