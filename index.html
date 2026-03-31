@@ -441,6 +441,7 @@ var currentRoster9 = [];          // DJ: 9-ball roster
 var pendingManualApa = '';        // APA# waiting for manual name entry
 var pendingManualFormat = '';     // "8", "9", or "" — which roster the manual entry is for
 var currentFormDivision = null;   // selected division object
+var currentFormDayTime = '';      // "Monday|6:30 PM" — selected day+time
 var currentFormIsReReg = false;
 var currentFormOrigTeam = '';
 var currentFormIsDj = false;
@@ -661,6 +662,7 @@ function startReRegister(teamIndex) {
 
   if (team.isDjPair) {
     currentFormOrigTeam = team.eightBallTeam.teamNumber;
+    currentFormIsDj = true;
     // Pre-fill rosters from current team data
     currentRoster8 = team.eightBallTeam.roster.map(function(p) {
       return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
@@ -672,10 +674,12 @@ function startReRegister(teamIndex) {
       title: 'Re-Register: ' + (team.eightBallTeam.teamName || team.baseName),
       teamName: team.eightBallTeam.teamName || team.baseName,
       hostLocation: team.eightBallTeam.venue || team.nineBallTeam.venue,
-      isDj: true
+      isDj: true,
+      preselDay: team.day
     });
   } else {
     currentFormOrigTeam = team.teamNumber;
+    currentFormIsDj = false;
     currentRoster = team.roster.map(function(p) {
       return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
     });
@@ -683,7 +687,8 @@ function startReRegister(teamIndex) {
       title: 'Re-Register: ' + team.teamName,
       teamName: team.teamName,
       hostLocation: team.venue,
-      isDj: false
+      isDj: false,
+      preselDay: team.day
     });
   }
 
@@ -722,28 +727,52 @@ function renderRegForm(opts) {
   html += '<input type="text" id="regTeamName" value="' + esc(opts.teamName) + '">';
   html += '</div>';
 
-  // Division picker
+  // Division picker — day + time only, grouped by day
   html += '<div class="form-group">';
-  html += '<label>Division (Format + Day)</label>';
+  html += '<label>Day &amp; Time of Play</label>';
   html += '<select id="regDivision" onchange="onDivisionChange()">';
   html += '<option value="">-- Select --</option>';
 
-  // Group divisions by format
-  var byFormat = {};
+  // Build unique day+time combos, each mapping to multiple division IDs
+  // (e.g., "Monday 6:30 PM" covers DJ West Hills, DJ Skyline, etc.)
+  // For the dropdown we group by day, showing day + time as the option.
+  // The actual division (area) is determined by the host location field.
+  var dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  var byDayTime = {};
   for (var i = 0; i < availableDivisions.length; i++) {
     var d = availableDivisions[i];
-    if (!byFormat[d.format]) byFormat[d.format] = [];
-    byFormat[d.format].push(d);
-  }
-  var formats = Object.keys(byFormat).sort();
-  for (var f = 0; f < formats.length; f++) {
-    html += '<optgroup label="' + esc(formats[f]) + '">';
-    var divs = byFormat[formats[f]];
-    for (var j = 0; j < divs.length; j++) {
-      var label = divs[j].day + (divs[j].areaDescription ? ' — ' + divs[j].areaDescription : '');
-      html += '<option value="' + esc(divs[j].divisionId) + '">' + esc(label) + '</option>';
+    var key = d.day + ' ' + d.time;
+    if (!byDayTime[key]) {
+      byDayTime[key] = { day: d.day, time: d.time, divIds: [], formats: {} };
     }
-    html += '</optgroup>';
+    byDayTime[key].divIds.push(d.divisionId);
+    byDayTime[key].formats[d.format] = true;
+  }
+
+  // Sort by day order
+  var dtKeys = Object.keys(byDayTime).sort(function(a, b) {
+    var da = byDayTime[a], db = byDayTime[b];
+    return dayOrder.indexOf(da.day) - dayOrder.indexOf(db.day);
+  });
+
+  // Pre-select for re-registration based on team's current day
+  var preselValue = '';
+  if (opts.preselDay) {
+    for (var ps = 0; ps < dtKeys.length; ps++) {
+      if (byDayTime[dtKeys[ps]].day === opts.preselDay) {
+        preselValue = dtKeys[ps];
+        break;
+      }
+    }
+  }
+
+  for (var dt = 0; dt < dtKeys.length; dt++) {
+    var combo = byDayTime[dtKeys[dt]];
+    var fmtList = Object.keys(combo.formats).sort().join(', ');
+    var label = combo.day + ' ' + combo.time + ' (' + fmtList + ')';
+    var optVal = combo.day + '|' + combo.time;
+    var sel = (optVal === preselValue) ? ' selected' : '';
+    html += '<option value="' + esc(optVal) + '"' + sel + '>' + esc(label) + '</option>';
   }
   html += '</select>';
   html += '</div>';
@@ -765,38 +794,51 @@ function renderRegForm(opts) {
 
   document.getElementById('regFormContent').innerHTML = html;
 
+  // If pre-selected, trigger division change to set form state
+  if (opts.preselDay) {
+    onDivisionChange();
+  }
+
   // Render roster(s)
   renderRosterArea();
 }
 
 function onDivisionChange() {
   var select = document.getElementById('regDivision');
-  var divId = select.value;
+  var val = select.value;  // "Monday|6:30 PM" or ""
+
+  // Find all divisions matching this day+time
   currentFormDivision = null;
+  currentFormDayTime = val;
 
-  for (var i = 0; i < availableDivisions.length; i++) {
-    if (availableDivisions[i].divisionId === divId) {
-      currentFormDivision = availableDivisions[i];
-      break;
+  if (val) {
+    var parts = val.split('|');
+    var selDay = parts[0];
+    var selTime = parts[1];
+
+    // Find the first matching division to get min/max roster
+    // Also check if any format in this day+time is DJ
+    var hasDj = false;
+    for (var i = 0; i < availableDivisions.length; i++) {
+      var d = availableDivisions[i];
+      if (d.day === selDay && d.time === selTime) {
+        if (!currentFormDivision) currentFormDivision = d;
+        var fmt = d.format.toLowerCase();
+        if (fmt.indexOf('dj') !== -1) hasDj = true;
+      }
     }
-  }
 
-  // Check if DJ format selected
-  var fmt = currentFormDivision ? currentFormDivision.format.toLowerCase() : '';
-  var isDj = fmt.indexOf('dj') !== -1 || fmt.indexOf('double jeopardy') !== -1;
-
-  if (isDj !== currentFormIsDj) {
-    currentFormIsDj = isDj;
-    if (isDj) {
-      // Move current roster to 8-ball, clear 9-ball
-      currentRoster8 = currentRoster.slice();
-      currentRoster9 = [];
-      currentRoster = [];
-    } else {
-      // Merge back
-      currentRoster = currentRoster8.slice();
-      currentRoster8 = [];
-      currentRoster9 = [];
+    if (hasDj !== currentFormIsDj) {
+      currentFormIsDj = hasDj;
+      if (hasDj) {
+        currentRoster8 = currentRoster.slice();
+        currentRoster9 = [];
+        currentRoster = [];
+      } else {
+        currentRoster = currentRoster8.slice();
+        currentRoster8 = [];
+        currentRoster9 = [];
+      }
     }
   }
 
@@ -981,11 +1023,25 @@ function cancelManualEntry(format) {
 function submitRegistration() {
   var teamName = document.getElementById('regTeamName').value.trim();
   var divSelect = document.getElementById('regDivision');
-  var divisionId = divSelect ? divSelect.value : '';
+  var dayTimeVal = divSelect ? divSelect.value : '';  // "Monday|6:30 PM"
   var hostLocation = document.getElementById('regHostLocation').value.trim();
 
   if (!teamName) { alert('Team name is required.'); return; }
-  if (!divisionId) { alert('Please select a division.'); return; }
+  if (!dayTimeVal) { alert('Please select a day & time.'); return; }
+
+  // Resolve day+time to a division ID. Pick the first matching active division.
+  // For DJ, the backend handles format assignment.
+  var parts = dayTimeVal.split('|');
+  var selDay = parts[0], selTime = parts[1];
+  var divisionId = '';
+  for (var di = 0; di < availableDivisions.length; di++) {
+    var ad = availableDivisions[di];
+    if (ad.day === selDay && ad.time === selTime) {
+      divisionId = ad.divisionId;
+      break;
+    }
+  }
+  if (!divisionId) { alert('No matching division found.'); return; }
 
   // Build payload
   var payload = {
