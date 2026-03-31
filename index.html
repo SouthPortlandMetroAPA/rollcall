@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RollCall — South Portland Metro APA</title>
+  <link rel="stylesheet" href="https://southportlandmetroapa.github.io/shared/spm-base.css">
+  <style>
+    /* ── Auth Screen ──────────────────────────────────────────────── */
+    .auth-wrap {
+      max-width: 480px;
+      margin: 60px auto 0;
+      text-align: center;
+    }
+    .auth-wrap p { color: var(--muted); margin: 8px 0 20px; }
+    .auth-row {
+      display: flex;
+      gap: 8px;
+    }
+    .auth-row input {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-size: 1rem;
+      outline: none;
+      min-height: 48px;
+    }
+    .auth-row input:focus { border-color: var(--spm-accent); }
+
+    /* ── Dashboard ────────────────────────────────────────────────── */
+    .welcome-pill {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 20px;
+      display: inline-block;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .deadline-banner {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    .closed-banner {
+      background: #f8d7da;
+      border: 1px solid #dc3545;
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      color: #721c24;
+    }
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 24px 0 12px;
+      color: var(--text);
+    }
+
+    /* ── Team Cards ───────────────────────────────────────────────── */
+    .team-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .team-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .team-card-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .team-card-meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .team-card-roster {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .team-card-roster .captain { font-weight: 600; color: var(--text); }
+    .badge-registered {
+      background: #d4edda;
+      color: #155724;
+    }
+    .badge-not-registered {
+      background: #e9ecef;
+      color: #495057;
+    }
+    .dj-label {
+      background: linear-gradient(135deg, var(--spm-primary), var(--spm-accent));
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .dj-sub {
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+    .dj-sub-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--spm-accent);
+      margin-bottom: 4px;
+    }
+
+    /* ── Registration Form ────────────────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 1rem;
+      outline: none;
+      min-height: 44px;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--spm-accent);
+    }
+    .form-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Roster Builder ───────────────────────────────────────────── */
+    .roster-section { margin-bottom: 20px; }
+    .roster-section-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .roster-count {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .roster-count.under { color: var(--spm-primary); }
+    .roster-count.ok { color: #28a745; }
+    .roster-entry {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      flex-wrap: wrap;
+    }
+    .roster-entry-name { flex: 1; min-width: 120px; }
+    .roster-entry-name .manual-badge {
+      background: #fff3cd;
+      color: #856404;
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+    .roster-entry-name .dup-warning {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--spm-primary);
+      margin-top: 2px;
+    }
+    .roster-entry select {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      min-height: 36px;
+    }
+    .roster-entry .remove-btn {
+      background: none;
+      border: none;
+      color: var(--spm-primary);
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 4px 8px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+    .add-player-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .add-player-row input {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      min-height: 44px;
+    }
+
+    /* ── Manual Entry Inline ──────────────────────────────────────── */
+    .manual-entry-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .manual-entry-row input {
+      flex: 1;
+      border: 2px solid #ffc107;
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      min-height: 44px;
+    }
+
+    /* ── Confirmation Screen ──────────────────────────────────────── */
+    .confirm-card {
+      text-align: center;
+      padding: 24px;
+    }
+    .confirm-card .checkmark {
+      font-size: 3rem;
+      color: #28a745;
+      margin-bottom: 12px;
+    }
+    .confirm-warnings {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 16px;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    /* ── Request Division Form ────────────────────────────────────── */
+    .request-form textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    /* ── Not Found Card ───────────────────────────────────────────── */
+    .not-found-card {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+    }
+
+    /* ── Action Bar (bottom fixed on mobile) ──────────────────────── */
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .action-bar .spm-btn { flex: 1; min-width: 140px; }
+
+    /* ── Loading ──────────────────────────────────────────────────── */
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+
+    /* ── Utility ──────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt-16 { margin-top: 16px; }
+    .mb-8 { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="spm-page" id="app">
+
+  <!-- ═══ Header ═══ -->
+  <div class="spm-header">
+    <h1>RollCall</h1>
+    <div class="spm-subtitle">Session Registration</div>
+  </div>
+
+  <!-- ═══ Screen: Auth ═══ -->
+  <div id="screenAuth">
+    <div class="auth-wrap">
+      <div class="spm-card">
+        <h2 style="margin:0 0 4px">Register for Next Session</h2>
+        <p>Enter your APA number or email to get started.</p>
+        <div class="auth-row">
+          <input type="text" id="authInput" placeholder="APA # or email"
+                 onkeydown="if(event.key==='Enter')doLookup()">
+          <button class="spm-btn spm-btn-primary" onclick="doLookup()">Look Up</button>
+        </div>
+        <div id="authError" class="form-hint" style="color:var(--spm-primary);margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Screen: Dashboard ═══ -->
+  <div id="screenDashboard" class="hidden">
+    <div id="welcomeArea"></div>
+    <div id="deadlineArea"></div>
+    <div id="teamsArea"></div>
+    <div class="action-bar" id="dashActions">
+      <button class="spm-btn spm-btn-primary" onclick="showNewTeamForm()">+ Register New Team</button>
+      <button class="spm-btn spm-btn-secondary" onclick="showRequestForm()">Request a Division</button>
+    </div>
+  </div>
+
+  <!-- ═══ Screen: Registration Form ═══ -->
+  <div id="screenRegForm" class="hidden">
+    <div class="spm-card">
+      <h2 id="regFormTitle" style="margin:0 0 16px">Register Team</h2>
+      <div id="regFormContent"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Screen: Confirmation ═══ -->
+  <div id="screenConfirm" class="hidden"></div>
+
+  <!-- ═══ Screen: Request Division ═══ -->
+  <div id="screenRequest" class="hidden">
+    <div class="spm-card request-form">
+      <h2 style="margin:0 0 16px">Request a Division</h2>
+      <div class="form-group">
+        <label>Describe the division you'd like</label>
+        <textarea id="requestText" placeholder="e.g., Wednesday night 8-Ball in the Beaverton area"></textarea>
+        <div class="form-hint">Include format, day, time, and area if possible.</div>
+      </div>
+      <div class="action-bar">
+        <button class="spm-btn spm-btn-primary" onclick="submitRequest()">Submit Request</button>
+        <button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Status ═══ -->
+  <div id="statusText" class="text-center mt-16" style="color:var(--muted);font-size:0.85rem"></div>
+
+  <div class="spm-footer">South Portland Metro APA &middot; RollCall</div>
+</div>
+
+<!-- ═══ Shared Core ═══ -->
+<script>
+  window.SPM_CONFIG = {
+    apiUrl: 'https://rollcall.spmapa.workers.dev'
+  };
+</script>
+<script src="https://southportlandmetroapa.github.io/shared/spm-core.js"></script>
+
+<script>
+// ========================================================================
+// RollCall — Player Frontend
+// ========================================================================
+// Screens: Auth → Dashboard → Registration Form → Confirmation
+//          Dashboard → Request Division
+// ========================================================================
+
+var currentPlayer = null;     // { memberNumber, firstName, lastName, email, phone }
+var currentTeams = [];        // enriched team array from lookupPlayer
+var availableDivisions = [];  // from getAvailableDivisions
+var registrationOpen = true;
+var registrationDeadline = null;
+
+// Roster state for the registration form
+var currentRoster = [];           // non-DJ: [{ memberNumber, playerName, role, manualEntry }]
+var currentRoster8 = [];          // DJ: 8-ball roster
+var currentRoster9 = [];          // DJ: 9-ball roster
+var pendingManualApa = '';        // APA# waiting for manual name entry
+var pendingManualFormat = '';     // "8", "9", or "" — which roster the manual entry is for
+var currentFormDivision = null;   // selected division object
+var currentFormIsReReg = false;
+var currentFormOrigTeam = '';
+var currentFormIsDj = false;
+
+// ── Screen navigation ──────────────────────────────────────────────
+function showScreen(id) {
+  var screens = ['screenAuth', 'screenDashboard', 'screenRegForm', 'screenConfirm', 'screenRequest'];
+  for (var i = 0; i < screens.length; i++) {
+    document.getElementById(screens[i]).classList.toggle('hidden', screens[i] !== id);
+  }
+}
+
+function showDashboard() { showScreen('screenDashboard'); }
+
+// ── Auth / Lookup ──────────────────────────────────────────────────
+function doLookup() {
+  var input = document.getElementById('authInput').value.trim();
+  if (!input) {
+    document.getElementById('authError').textContent = 'Please enter your APA number or email.';
+    return;
+  }
+  document.getElementById('authError').textContent = '';
+  SPM.setStatus('Looking up...');
+
+  SPM.callServer('lookupPlayer', { input: input }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) {
+      document.getElementById('authError').textContent = data.error || 'Lookup failed.';
+      return;
+    }
+    if (!data.found) {
+      document.getElementById('authError').textContent = data.message || 'Not found.';
+      return;
+    }
+
+    currentPlayer = data.player;
+    currentTeams = data.teams || [];
+    registrationOpen = data.registrationOpen;
+    registrationDeadline = data.deadline;
+
+    // Fetch available divisions in parallel
+    SPM.callServer('getAvailableDivisions').then(function(divData) {
+      availableDivisions = (divData.success && divData.divisions) ? divData.divisions : [];
+      renderDashboard();
+      showScreen('screenDashboard');
+    });
+  }).catch(function(err) {
+    SPM.setStatus('');
+    document.getElementById('authError').textContent = 'Network error. Please try again.';
+  });
+}
+
+// ── Dashboard Rendering ────────────────────────────────────────────
+function renderDashboard() {
+  var esc = SPM.esc;
+
+  // Welcome
+  document.getElementById('welcomeArea').innerHTML =
+    '<div class="welcome-pill">Welcome, ' + esc(currentPlayer.firstName) + ' ' +
+    esc(currentPlayer.lastName) + ' (' + esc(currentPlayer.memberNumber) + ')</div>';
+
+  // Deadline / closed banner
+  var deadlineHtml = '';
+  if (!registrationOpen) {
+    deadlineHtml = '<div class="closed-banner">Registration is closed.' +
+      (registrationDeadline ? ' The deadline was ' + esc(registrationDeadline) + '.' : '') +
+      ' Contact the league operator for late registration.</div>';
+  } else if (registrationDeadline) {
+    deadlineHtml = '<div class="deadline-banner">Registration deadline: <strong>' +
+      esc(registrationDeadline) + '</strong></div>';
+  }
+  document.getElementById('deadlineArea').innerHTML = deadlineHtml;
+
+  // Disable registration buttons if closed
+  var dashBtns = document.getElementById('dashActions');
+  if (!registrationOpen) {
+    dashBtns.classList.add('hidden');
+  } else {
+    dashBtns.classList.remove('hidden');
+  }
+
+  // Team cards
+  var teamsHtml = '<div class="section-title">Your Current Teams</div>';
+
+  if (currentTeams.length === 0) {
+    teamsHtml += '<div class="spm-card not-found-card">You are not on any teams this session.</div>';
+  }
+
+  for (var i = 0; i < currentTeams.length; i++) {
+    teamsHtml += buildTeamCard(currentTeams[i], i);
+  }
+
+  document.getElementById('teamsArea').innerHTML = teamsHtml;
+}
+
+function buildTeamCard(team, index) {
+  var esc = SPM.esc;
+  var html = '<div class="team-card">';
+
+  // Header row
+  html += '<div class="team-card-header">';
+
+  if (team.isDjPair) {
+    html += '<div>';
+    html += '<span class="dj-label">DJ</span> ';
+    html += '<span class="team-card-name">' + esc(team.eightBallTeam.teamName || team.baseName) + '</span>';
+    html += '</div>';
+  } else {
+    html += '<span class="team-card-name">' + esc(team.teamName) + '</span>';
+  }
+
+  // Status badge
+  var isRegistered = !!team.registrationStatus;
+  html += '<span class="spm-badge ' + (isRegistered ? 'badge-registered' : 'badge-not-registered') + '">' +
+    (isRegistered ? 'Registered' : 'Not Registered') + '</span>';
+  html += '</div>';
+
+  if (team.isDjPair) {
+    // Meta
+    html += '<div class="team-card-meta">' + esc(team.day) + ' &middot; ' +
+      esc(team.eightBallTeam.venue || team.nineBallTeam.venue) + '</div>';
+
+    // 8-ball sub
+    html += '<div class="dj-sub">';
+    html += '<div class="dj-sub-label">8-Ball &middot; Team #' + esc(team.eightBallTeam.teamNumber) + '</div>';
+    html += buildRosterSummary(team.eightBallTeam.roster);
+    html += '</div>';
+
+    // 9-ball sub
+    html += '<div class="dj-sub">';
+    html += '<div class="dj-sub-label">9-Ball &middot; Team #' + esc(team.nineBallTeam.teamNumber) + '</div>';
+    html += buildRosterSummary(team.nineBallTeam.roster);
+    html += '</div>';
+  } else {
+    html += '<div class="team-card-meta">Team #' + esc(team.teamNumber) + ' &middot; ' +
+      esc(team.day) + ' &middot; ' + esc(team.format) + ' &middot; ' + esc(team.venue) + '</div>';
+    html += buildRosterSummary(team.roster);
+  }
+
+  // Action buttons
+  if (registrationOpen && team.canRegister && !isRegistered) {
+    html += '<div class="action-bar">';
+    html += '<button class="spm-btn spm-btn-primary" onclick="startReRegister(' + index + ')">Re-Register This Team</button>';
+    html += '</div>';
+  } else if (registrationOpen && isRegistered) {
+    html += '<div class="action-bar">';
+    html += '<button class="spm-btn spm-btn-danger" onclick="cancelReg(\'' + esc(team.registrationId || team.djPairId || '') + '\')">Cancel Registration</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function buildRosterSummary(roster) {
+  var esc = SPM.esc;
+  var html = '<div class="team-card-roster">';
+  for (var i = 0; i < roster.length; i++) {
+    var p = roster[i];
+    var cls = (p.role === 'Captain' || p.role === 'Co-Captain') ? ' class="captain"' : '';
+    var roleTag = p.role ? ' (' + p.role + ')' : '';
+    html += '<span' + cls + '>' + esc(p.playerName) + esc(roleTag) + '</span>';
+    if (i < roster.length - 1) html += ', ';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── Cancel Registration ────────────────────────────────────────────
+function cancelReg(regId) {
+  if (!confirm('Cancel this registration?')) return;
+
+  SPM.setStatus('Cancelling...');
+  SPM.callServer('cancelRegistration', {
+    registrationId: regId,
+    memberNumber: currentPlayer.memberNumber
+  }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Cancel failed.'); return; }
+    // Refresh
+    doLookup();
+  }).catch(function() {
+    SPM.setStatus('');
+    alert('Network error.');
+  });
+}
+
+// ── Re-Register Flow ───────────────────────────────────────────────
+function startReRegister(teamIndex) {
+  var team = currentTeams[teamIndex];
+  currentFormIsReReg = true;
+  currentFormIsDj = team.isDjPair;
+
+  if (team.isDjPair) {
+    currentFormOrigTeam = team.eightBallTeam.teamNumber;
+    // Pre-fill rosters from current team data
+    currentRoster8 = team.eightBallTeam.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
+    });
+    currentRoster9 = team.nineBallTeam.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
+    });
+    renderRegForm({
+      title: 'Re-Register: ' + (team.eightBallTeam.teamName || team.baseName),
+      teamName: team.eightBallTeam.teamName || team.baseName,
+      hostLocation: team.eightBallTeam.venue || team.nineBallTeam.venue,
+      isDj: true
+    });
+  } else {
+    currentFormOrigTeam = team.teamNumber;
+    currentRoster = team.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
+    });
+    renderRegForm({
+      title: 'Re-Register: ' + team.teamName,
+      teamName: team.teamName,
+      hostLocation: team.venue,
+      isDj: false
+    });
+  }
+
+  showScreen('screenRegForm');
+}
+
+// ── New Team Flow ──────────────────────────────────────────────────
+function showNewTeamForm() {
+  currentFormIsReReg = false;
+  currentFormIsDj = false;
+  currentFormOrigTeam = '';
+  currentRoster = [];
+  currentRoster8 = [];
+  currentRoster9 = [];
+
+  renderRegForm({
+    title: 'Register New Team',
+    teamName: '',
+    hostLocation: '',
+    isDj: false
+  });
+
+  showScreen('screenRegForm');
+}
+
+// ── Registration Form Rendering ────────────────────────────────────
+function renderRegForm(opts) {
+  document.getElementById('regFormTitle').textContent = opts.title;
+
+  var esc = SPM.esc;
+  var html = '';
+
+  // Team name
+  html += '<div class="form-group">';
+  html += '<label>Team Name</label>';
+  html += '<input type="text" id="regTeamName" value="' + esc(opts.teamName) + '">';
+  html += '</div>';
+
+  // Division picker
+  html += '<div class="form-group">';
+  html += '<label>Division (Format + Day)</label>';
+  html += '<select id="regDivision" onchange="onDivisionChange()">';
+  html += '<option value="">-- Select --</option>';
+
+  // Group divisions by format
+  var byFormat = {};
+  for (var i = 0; i < availableDivisions.length; i++) {
+    var d = availableDivisions[i];
+    if (!byFormat[d.format]) byFormat[d.format] = [];
+    byFormat[d.format].push(d);
+  }
+  var formats = Object.keys(byFormat).sort();
+  for (var f = 0; f < formats.length; f++) {
+    html += '<optgroup label="' + esc(formats[f]) + '">';
+    var divs = byFormat[formats[f]];
+    for (var j = 0; j < divs.length; j++) {
+      var label = divs[j].day + (divs[j].areaDescription ? ' — ' + divs[j].areaDescription : '');
+      html += '<option value="' + esc(divs[j].divisionId) + '">' + esc(label) + '</option>';
+    }
+    html += '</optgroup>';
+  }
+  html += '</select>';
+  html += '</div>';
+
+  // Host location
+  html += '<div class="form-group">';
+  html += '<label>Host Location / Area</label>';
+  html += '<input type="text" id="regHostLocation" value="' + esc(opts.hostLocation) + '" placeholder="Venue name or area">';
+  html += '</div>';
+
+  // Roster area (rendered dynamically based on DJ or not)
+  html += '<div id="rosterArea"></div>';
+
+  // Submit
+  html += '<div class="action-bar">';
+  html += '<button class="spm-btn spm-btn-primary" id="submitRegBtn" onclick="submitRegistration()">Submit Registration</button>';
+  html += '<button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Cancel</button>';
+  html += '</div>';
+
+  document.getElementById('regFormContent').innerHTML = html;
+
+  // Render roster(s)
+  renderRosterArea();
+}
+
+function onDivisionChange() {
+  var select = document.getElementById('regDivision');
+  var divId = select.value;
+  currentFormDivision = null;
+
+  for (var i = 0; i < availableDivisions.length; i++) {
+    if (availableDivisions[i].divisionId === divId) {
+      currentFormDivision = availableDivisions[i];
+      break;
+    }
+  }
+
+  // Check if DJ format selected
+  var fmt = currentFormDivision ? currentFormDivision.format.toLowerCase() : '';
+  var isDj = fmt.indexOf('dj') !== -1 || fmt.indexOf('double jeopardy') !== -1;
+
+  if (isDj !== currentFormIsDj) {
+    currentFormIsDj = isDj;
+    if (isDj) {
+      // Move current roster to 8-ball, clear 9-ball
+      currentRoster8 = currentRoster.slice();
+      currentRoster9 = [];
+      currentRoster = [];
+    } else {
+      // Merge back
+      currentRoster = currentRoster8.slice();
+      currentRoster8 = [];
+      currentRoster9 = [];
+    }
+  }
+
+  renderRosterArea();
+}
+
+function renderRosterArea() {
+  var html = '';
+
+  if (currentFormIsDj) {
+    html += buildRosterSection('8-Ball Roster', currentRoster8, '8');
+    html += buildRosterSection('9-Ball Roster', currentRoster9, '9');
+  } else {
+    html += buildRosterSection('Roster', currentRoster, '');
+  }
+
+  document.getElementById('rosterArea').innerHTML = html;
+}
+
+function buildRosterSection(title, roster, format) {
+  var esc = SPM.esc;
+  var min = currentFormDivision ? currentFormDivision.minRoster : 0;
+  var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
+  var countCls = (min > 0 && roster.length < min) ? 'under' : 'ok';
+  var countText = roster.length + (min || max ? ' / ' + min + '-' + max : '');
+
+  var html = '<div class="roster-section">';
+  html += '<div class="roster-section-title">';
+  html += '<span>' + esc(title) + '</span>';
+  html += '<span class="roster-count ' + countCls + '">' + esc(countText) + ' players</span>';
+  html += '</div>';
+
+  // Player rows
+  for (var i = 0; i < roster.length; i++) {
+    var p = roster[i];
+    html += '<div class="roster-entry">';
+    html += '<div class="roster-entry-name">';
+    html += esc(p.playerName) + ' (' + esc(p.memberNumber) + ')';
+    if (p.manualEntry) html += '<span class="manual-badge">Unverified</span>';
+    if (p.dupWarning) html += '<span class="dup-warning">' + esc(p.dupWarning) + '</span>';
+    html += '</div>';
+    html += '<select onchange="setRole(' + i + ', this.value, \'' + format + '\')">';
+    html += '<option value="Player"' + (p.role === 'Player' ? ' selected' : '') + '>Player</option>';
+    html += '<option value="Captain"' + (p.role === 'Captain' ? ' selected' : '') + '>Captain</option>';
+    html += '<option value="Co-Captain"' + (p.role === 'Co-Captain' ? ' selected' : '') + '>Co-Captain</option>';
+    html += '</select>';
+    html += '<button class="remove-btn" onclick="removePlayer(' + i + ', \'' + format + '\')" title="Remove">&times;</button>';
+    html += '</div>';
+  }
+
+  // Add player input
+  var inputId = 'addPlayerInput' + format;
+  html += '<div class="add-player-row">';
+  html += '<input type="text" id="' + inputId + '" placeholder="APA # to add" onkeydown="if(event.key===\'Enter\')addPlayer(\'' + format + '\')">';
+  html += '<button class="spm-btn spm-btn-secondary" onclick="addPlayer(\'' + format + '\')">Add</button>';
+  html += '</div>';
+
+  // Manual entry area (shown when APA# not found)
+  var manualId = 'manualArea' + format;
+  html += '<div id="' + manualId + '"></div>';
+
+  html += '</div>';
+  return html;
+}
+
+function getRoster(format) {
+  if (format === '8') return currentRoster8;
+  if (format === '9') return currentRoster9;
+  return currentRoster;
+}
+
+function setRole(index, role, format) {
+  var roster = getRoster(format);
+  roster[index].role = role;
+  // No re-render needed — the select already shows the new value
+}
+
+function removePlayer(index, format) {
+  var roster = getRoster(format);
+  roster.splice(index, 1);
+  renderRosterArea();
+}
+
+function addPlayer(format) {
+  var inputId = 'addPlayerInput' + format;
+  var input = document.getElementById(inputId);
+  var raw = input.value.trim();
+  if (!raw) return;
+
+  // Check if already on this roster
+  var roster = getRoster(format);
+  var normalized = raw.replace(/\D/g, '');
+  for (var i = 0; i < roster.length; i++) {
+    if (roster[i].memberNumber === normalized) {
+      alert('This player is already on the roster.');
+      return;
+    }
+  }
+
+  SPM.setStatus('Looking up #' + raw + '...');
+
+  SPM.callServer('lookupMember', { memberNumber: raw }).then(function(data) {
+    SPM.setStatus('');
+    if (data.found) {
+      roster.push({
+        memberNumber: data.found ? normalized : normalized,
+        playerName: data.playerName,
+        role: 'Player',
+        manualEntry: false
+      });
+      input.value = '';
+      renderRosterArea();
+    } else {
+      // Show manual entry
+      pendingManualApa = normalized;
+      pendingManualFormat = format;
+      var manualId = 'manualArea' + format;
+      document.getElementById(manualId).innerHTML =
+        '<div class="manual-entry-row">' +
+        '<span style="font-size:0.85rem;color:var(--spm-primary)">APA #' + SPM.esc(normalized) + ' not found.</span>' +
+        '</div>' +
+        '<div class="manual-entry-row">' +
+        '<input type="text" id="manualNameInput' + format + '" placeholder="Enter player name manually" ' +
+        'onkeydown="if(event.key===\'Enter\')confirmManualEntry(\'' + format + '\')">' +
+        '<button class="spm-btn spm-btn-secondary" onclick="confirmManualEntry(\'' + format + '\')">Add</button>' +
+        '<button class="spm-btn spm-btn-danger" onclick="cancelManualEntry(\'' + format + '\')" style="min-width:auto;padding:8px 12px">&times;</button>' +
+        '</div>';
+    }
+  }).catch(function() {
+    SPM.setStatus('');
+    alert('Network error looking up player.');
+  });
+}
+
+function confirmManualEntry(format) {
+  var nameInput = document.getElementById('manualNameInput' + format);
+  var name = nameInput.value.trim();
+  if (!name) { alert('Please enter the player name.'); return; }
+
+  var roster = getRoster(format);
+  roster.push({
+    memberNumber: pendingManualApa,
+    playerName: name,
+    role: 'Player',
+    manualEntry: true
+  });
+  pendingManualApa = '';
+  pendingManualFormat = '';
+
+  // Clear the add input too
+  var addInput = document.getElementById('addPlayerInput' + format);
+  if (addInput) addInput.value = '';
+
+  renderRosterArea();
+}
+
+function cancelManualEntry(format) {
+  pendingManualApa = '';
+  pendingManualFormat = '';
+  document.getElementById('manualArea' + format).innerHTML = '';
+}
+
+// ── Submit Registration ────────────────────────────────────────────
+function submitRegistration() {
+  var teamName = document.getElementById('regTeamName').value.trim();
+  var divSelect = document.getElementById('regDivision');
+  var divisionId = divSelect ? divSelect.value : '';
+  var hostLocation = document.getElementById('regHostLocation').value.trim();
+
+  if (!teamName) { alert('Team name is required.'); return; }
+  if (!divisionId) { alert('Please select a division.'); return; }
+
+  // Build payload
+  var payload = {
+    teamName: teamName,
+    divisionId: divisionId,
+    hostLocation: hostLocation,
+    isReRegistration: currentFormIsReReg,
+    originalTeamNumber: currentFormOrigTeam,
+    isDjPair: currentFormIsDj,
+    registeredBy: currentPlayer.memberNumber
+  };
+
+  if (currentFormIsDj) {
+    // Extract captains from roster roles
+    var capt8 = '', capt9 = '';
+    for (var i = 0; i < currentRoster8.length; i++) {
+      if (currentRoster8[i].role === 'Captain') capt8 = currentRoster8[i].memberNumber;
+    }
+    for (var j = 0; j < currentRoster9.length; j++) {
+      if (currentRoster9[j].role === 'Captain') capt9 = currentRoster9[j].memberNumber;
+    }
+    payload.captain = capt8 || capt9 || currentPlayer.memberNumber;
+    payload.coCaptain = '';
+    payload.eightBallRoster = currentRoster8;
+    payload.nineBallRoster = currentRoster9;
+  } else {
+    var capt = '', coCapt = '';
+    for (var k = 0; k < currentRoster.length; k++) {
+      if (currentRoster[k].role === 'Captain') capt = currentRoster[k].memberNumber;
+      if (currentRoster[k].role === 'Co-Captain') coCapt = currentRoster[k].memberNumber;
+    }
+    payload.captain = capt || currentPlayer.memberNumber;
+    payload.coCaptain = coCapt;
+    payload.roster = currentRoster;
+  }
+
+  SPM.setStatus('Submitting registration...');
+  document.getElementById('submitRegBtn').disabled = true;
+
+  SPM.callServer('registerTeam', payload).then(function(data) {
+    SPM.setStatus('');
+    document.getElementById('submitRegBtn').disabled = false;
+
+    if (!data.success) {
+      alert(data.error || 'Registration failed.');
+      return;
+    }
+
+    showConfirmation(data);
+  }).catch(function() {
+    SPM.setStatus('');
+    document.getElementById('submitRegBtn').disabled = false;
+    alert('Network error. Please try again.');
+  });
+}
+
+// ── Confirmation Screen ────────────────────────────────────────────
+function showConfirmation(data) {
+  var esc = SPM.esc;
+  var html = '<div class="spm-card confirm-card">';
+  html += '<div class="checkmark">&#10003;</div>';
+  html += '<h2>Registration Submitted!</h2>';
+  html += '<p><strong>' + esc(data.teamName) + '</strong></p>';
+  html += '<p>' + esc(data.format) + ' &middot; ' + esc(data.day) + '</p>';
+
+  if (data.warnings && data.warnings.length > 0) {
+    html += '<div class="confirm-warnings">';
+    html += '<strong>Warnings:</strong><br>';
+    for (var i = 0; i < data.warnings.length; i++) {
+      html += esc(data.warnings[i]) + '<br>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div class="action-bar" style="justify-content:center;margin-top:20px">';
+  html += '<button class="spm-btn spm-btn-primary" onclick="doLookup()">Back to Dashboard</button>';
+  html += '<button class="spm-btn spm-btn-secondary" onclick="showNewTeamForm()">Register Another Team</button>';
+  html += '</div>';
+  html += '</div>';
+
+  document.getElementById('screenConfirm').innerHTML = html;
+  showScreen('screenConfirm');
+}
+
+// ── Request Division Screen ────────────────────────────────────────
+function showRequestForm() {
+  document.getElementById('requestText').value = '';
+  showScreen('screenRequest');
+}
+
+function submitRequest() {
+  var text = document.getElementById('requestText').value.trim();
+  if (!text) { alert('Please describe the division you want.'); return; }
+
+  SPM.setStatus('Submitting request...');
+  SPM.callServer('requestDivision', {
+    memberNumber: currentPlayer.memberNumber,
+    requestText: text
+  }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Request failed.'); return; }
+    alert('Your division request has been submitted. Thank you!');
+    showDashboard();
+  }).catch(function() {
+    SPM.setStatus('');
+    alert('Network error.');
+  });
+}
+</script>
+</body>
+</html>

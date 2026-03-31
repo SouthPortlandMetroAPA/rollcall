@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RollCall Admin — South Portland Metro APA</title>
+  <link rel="stylesheet" href="https://southportlandmetroapa.github.io/shared/spm-base.css">
+  <style>
+    /* ── Tabs ─────────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 44px;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--spm-primary), var(--spm-accent));
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* ── Tables ────────────────────────────────────────────────────── */
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .admin-table th {
+      background: #f8f9fa;
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    .admin-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    .admin-table tr:hover td { background: #f8f9fa; }
+    .admin-table .status-submitted { color: #28a745; font-weight: 600; }
+    .admin-table .status-cancelled { color: #dc3545; text-decoration: line-through; }
+
+    /* ── Expandable roster ─────────────────────────────────────────── */
+    .roster-toggle {
+      cursor: pointer;
+      color: var(--spm-accent);
+      text-decoration: underline;
+      font-size: 0.8rem;
+    }
+    .roster-detail {
+      display: none;
+      padding: 8px 0 8px 16px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .roster-detail.open { display: block; }
+    .roster-detail .manual { color: #856404; font-weight: 600; }
+    .roster-detail .dup { color: var(--spm-primary); }
+
+    /* ── Add Division Form ─────────────────────────────────────────── */
+    .add-form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    }
+    .add-form .field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .add-form label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .add-form input, .add-form select {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      min-height: 36px;
+    }
+
+    /* ── Config Panel ──────────────────────────────────────────────── */
+    .config-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      flex-wrap: wrap;
+    }
+    .config-row label {
+      font-weight: 600;
+      min-width: 180px;
+    }
+    .config-row input, .config-row select {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      min-height: 36px;
+    }
+
+    /* ── Filter bar ────────────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filter-bar select {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      min-height: 36px;
+    }
+
+    /* ── Requests list ─────────────────────────────────────────────── */
+    .request-item {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .request-item .req-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .request-item .req-text {
+      font-size: 0.9rem;
+    }
+
+    /* ── Utility ──────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt-8 { margin-top: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+    .table-wrap { overflow-x: auto; }
+
+    @media (max-width: 767px) {
+      .admin-table { font-size: 0.78rem; }
+      .admin-table th, .admin-table td { padding: 6px 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="spm-page" id="app">
+
+  <!-- ═══ Header ═══ -->
+  <div class="spm-header">
+    <h1>RollCall Admin</h1>
+    <div class="spm-subtitle">Session Registration Management</div>
+  </div>
+
+  <!-- ═══ Loading ═══ -->
+  <div id="loadingArea" class="text-center" style="padding:40px;color:var(--muted)">Loading...</div>
+
+  <!-- ═══ Main Content ═══ -->
+  <div id="mainContent" class="hidden">
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('registrations')">Registrations</button>
+      <button class="tab-btn" onclick="switchTab('divisions')">Divisions</button>
+      <button class="tab-btn" onclick="switchTab('requests')">Requests</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config</button>
+    </div>
+
+    <!-- Tab: Registrations -->
+    <div id="tabRegistrations"></div>
+
+    <!-- Tab: Divisions -->
+    <div id="tabDivisions" class="hidden"></div>
+
+    <!-- Tab: Requests -->
+    <div id="tabRequests" class="hidden"></div>
+
+    <!-- Tab: Config -->
+    <div id="tabConfig" class="hidden"></div>
+  </div>
+
+  <div id="statusText" class="text-center mt-8" style="color:var(--muted);font-size:0.85rem"></div>
+  <div class="spm-footer">South Portland Metro APA &middot; RollCall Admin</div>
+</div>
+
+<script>
+  // Extract admin token from URL
+  var params = new URLSearchParams(window.location.search);
+  var adminToken = params.get('admin') || '';
+
+  window.SPM_CONFIG = {
+    apiUrl: 'https://rollcall.spmapa.workers.dev',
+    adminToken: adminToken
+  };
+</script>
+<script src="https://southportlandmetroapa.github.io/shared/spm-core.js"></script>
+
+<script>
+// ========================================================================
+// RollCall Admin
+// ========================================================================
+
+var adminData = null;  // { registrations, rosterEntries, divisionRequests, divisions, config }
+
+// ── Tab Switching ──────────────────────────────────────────────────
+function switchTab(tab) {
+  var tabs = ['Registrations', 'Divisions', 'Requests', 'Config'];
+  for (var i = 0; i < tabs.length; i++) {
+    var el = document.getElementById('tab' + tabs[i]);
+    el.classList.toggle('hidden', tabs[i].toLowerCase() !== tab);
+  }
+  var btns = document.querySelectorAll('.tab-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].classList.toggle('active', btns[j].textContent.toLowerCase() === tab);
+  }
+}
+
+// ── Initial Load ───────────────────────────────────────────────────
+function loadAdminData() {
+  SPM.setStatus('Loading...');
+  SPM.callServer('getAdminData').then(function(data) {
+    SPM.setStatus('');
+    document.getElementById('loadingArea').classList.add('hidden');
+    document.getElementById('mainContent').classList.remove('hidden');
+
+    if (!data.success) {
+      document.getElementById('loadingArea').classList.remove('hidden');
+      document.getElementById('loadingArea').textContent = data.error || 'Failed to load.';
+      document.getElementById('mainContent').classList.add('hidden');
+      return;
+    }
+
+    adminData = data;
+    renderRegistrations();
+    renderDivisions();
+    renderRequests();
+    renderConfig();
+  }).catch(function(err) {
+    SPM.setStatus('');
+    document.getElementById('loadingArea').textContent = 'Network error.';
+  });
+}
+
+// ── Registrations Tab ──────────────────────────────────────────────
+function renderRegistrations() {
+  var esc = SPM.esc;
+  var regs = adminData.registrations || [];
+  var roster = adminData.rosterEntries || [];
+
+  // Build roster lookup: regId → [entries]
+  var rosterByReg = {};
+  for (var r = 0; r < roster.length; r++) {
+    var rid = roster[r].registrationId;
+    if (!rosterByReg[rid]) rosterByReg[rid] = [];
+    rosterByReg[rid].push(roster[r]);
+  }
+
+  // Filter controls
+  var html = '<div class="filter-bar">';
+  html += '<select id="filterFormat" onchange="renderRegistrations()"><option value="">All Formats</option>';
+  var formats = {};
+  for (var i = 0; i < regs.length; i++) { if (regs[i].format) formats[regs[i].format] = true; }
+  var fmtKeys = Object.keys(formats).sort();
+  for (var f = 0; f < fmtKeys.length; f++) {
+    html += '<option value="' + esc(fmtKeys[f]) + '">' + esc(fmtKeys[f]) + '</option>';
+  }
+  html += '</select>';
+
+  html += '<select id="filterDay" onchange="renderRegistrations()"><option value="">All Days</option>';
+  var days = {};
+  for (var d = 0; d < regs.length; d++) { if (regs[d].day) days[regs[d].day] = true; }
+  var dayKeys = Object.keys(days).sort();
+  for (var dk = 0; dk < dayKeys.length; dk++) {
+    html += '<option value="' + esc(dayKeys[dk]) + '">' + esc(dayKeys[dk]) + '</option>';
+  }
+  html += '</select>';
+
+  html += '<select id="filterStatus" onchange="renderRegistrations()"><option value="">All Status</option>';
+  html += '<option value="submitted">Submitted</option><option value="cancelled">Cancelled</option></select>';
+  html += '<button class="spm-btn spm-btn-secondary" style="padding:6px 14px;font-size:0.8rem" onclick="exportCsv()">&#8595; CSV</button>';
+  html += '</div>';
+
+  // Apply filters (read from existing selects if they exist)
+  var selFmt = document.getElementById('filterFormat');
+  var selDay = document.getElementById('filterDay');
+  var selStatus = document.getElementById('filterStatus');
+  var fFmt = selFmt ? selFmt.value : '';
+  var fDay = selDay ? selDay.value : '';
+  var fStatus = selStatus ? selStatus.value : '';
+
+  var filtered = regs.filter(function(reg) {
+    if (fFmt && reg.format !== fFmt) return false;
+    if (fDay && reg.day !== fDay) return false;
+    if (fStatus && reg.status !== fStatus) return false;
+    return true;
+  });
+
+  // Summary
+  var submitted = filtered.filter(function(r) { return r.status === 'submitted'; }).length;
+  html += '<div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">' +
+    filtered.length + ' registrations (' + submitted + ' active)</div>';
+
+  // Table
+  html += '<div class="table-wrap"><table class="admin-table">';
+  html += '<thead><tr><th>Team</th><th>Format</th><th>Day</th><th>Location</th><th>Captain</th><th>Roster</th><th>Status</th><th>Date</th></tr></thead>';
+  html += '<tbody>';
+
+  for (var t = 0; t < filtered.length; t++) {
+    var reg = filtered[t];
+    var regRoster = rosterByReg[reg.registrationId] || [];
+    var statusCls = reg.status === 'cancelled' ? 'status-cancelled' : 'status-submitted';
+
+    html += '<tr>';
+    html += '<td>' + esc(reg.teamName) + (reg.isReRegistration === 'yes' ? ' <small>(re-reg #' + esc(reg.originalTeamNumber) + ')</small>' : '') + '</td>';
+    html += '<td>' + esc(reg.format) + '</td>';
+    html += '<td>' + esc(reg.day) + '</td>';
+    html += '<td>' + esc(reg.hostLocation) + '</td>';
+    html += '<td>' + esc(reg.captain) + '</td>';
+    html += '<td>';
+    html += '<span class="roster-toggle" onclick="toggleRoster(\'' + esc(reg.registrationId) + '\')">' + regRoster.length + ' players</span>';
+    html += '<div class="roster-detail" id="roster-' + esc(reg.registrationId) + '">';
+    for (var rr = 0; rr < regRoster.length; rr++) {
+      var re = regRoster[rr];
+      html += esc(re.playerName) + ' (' + esc(re.memberNumber) + ') — ' + esc(re.role);
+      if (re.format) html += ' [' + esc(re.format) + '-ball]';
+      if (re.manualEntry === 'yes') html += ' <span class="manual">[MANUAL]</span>';
+      if (re.duplicateWarning) html += ' <span class="dup">' + esc(re.duplicateWarning) + '</span>';
+      html += '<br>';
+    }
+    html += '</div>';
+    html += '</td>';
+    html += '<td class="' + statusCls + '">' + esc(reg.status) + '</td>';
+    html += '<td style="white-space:nowrap">' + esc(reg.timestamp) + '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  document.getElementById('tabRegistrations').innerHTML = html;
+
+  // Restore filter selections
+  if (fFmt) document.getElementById('filterFormat').value = fFmt;
+  if (fDay) document.getElementById('filterDay').value = fDay;
+  if (fStatus) document.getElementById('filterStatus').value = fStatus;
+}
+
+function toggleRoster(regId) {
+  var el = document.getElementById('roster-' + regId);
+  if (el) el.classList.toggle('open');
+}
+
+// ── CSV Export ──────────────────────────────────────────────────────
+function exportCsv() {
+  var regs = adminData.registrations || [];
+  var roster = adminData.rosterEntries || [];
+
+  var rosterByReg = {};
+  for (var r = 0; r < roster.length; r++) {
+    var rid = roster[r].registrationId;
+    if (!rosterByReg[rid]) rosterByReg[rid] = [];
+    rosterByReg[rid].push(roster[r]);
+  }
+
+  var headers = ['Team Name','Format','Day','Host Location','Captain','Co-Captain',
+    'Status','Re-Registration','Original Team #','Registered At',
+    'Member #','Player Name','Role','Roster Format','Manual Entry','Duplicate Warning'];
+
+  var rows = [headers.join(',')];
+
+  for (var i = 0; i < regs.length; i++) {
+    var reg = regs[i];
+    var entries = rosterByReg[reg.registrationId] || [];
+    if (entries.length === 0) {
+      rows.push([
+        csvEsc(reg.teamName), csvEsc(reg.format), csvEsc(reg.day), csvEsc(reg.hostLocation),
+        csvEsc(reg.captain), csvEsc(reg.coCaptain), csvEsc(reg.status),
+        csvEsc(reg.isReRegistration), csvEsc(reg.originalTeamNumber), csvEsc(reg.timestamp),
+        '', '', '', '', '', ''
+      ].join(','));
+    } else {
+      for (var j = 0; j < entries.length; j++) {
+        var e = entries[j];
+        rows.push([
+          csvEsc(reg.teamName), csvEsc(reg.format), csvEsc(reg.day), csvEsc(reg.hostLocation),
+          csvEsc(reg.captain), csvEsc(reg.coCaptain), csvEsc(reg.status),
+          csvEsc(reg.isReRegistration), csvEsc(reg.originalTeamNumber), csvEsc(reg.timestamp),
+          csvEsc(e.memberNumber), csvEsc(e.playerName), csvEsc(e.role),
+          csvEsc(e.format), csvEsc(e.manualEntry), csvEsc(e.duplicateWarning)
+        ].join(','));
+      }
+    }
+  }
+
+  var csv = rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = 'rollcall-registrations.csv';
+  link.click();
+}
+
+function csvEsc(val) {
+  var s = String(val || '');
+  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// ── Divisions Tab ──────────────────────────────────────────────────
+function renderDivisions() {
+  var esc = SPM.esc;
+  var divs = adminData.divisions || [];
+
+  // Also read inactive divisions from registrations data to show all
+  var html = '<h3 style="margin:0 0 12px">Manage Divisions</h3>';
+
+  // Add form
+  html += '<div class="add-form">';
+  html += '<div class="field"><label>Format</label><select id="addDivFormat">';
+  var formats = ['8-Ball Open','9-Ball Open','DJ','Masters','Ladies','8-Ball Doubles','9-Ball Doubles','DJ Doubles'];
+  for (var f = 0; f < formats.length; f++) {
+    html += '<option>' + esc(formats[f]) + '</option>';
+  }
+  html += '</select></div>';
+  html += '<div class="field"><label>Day</label><select id="addDivDay">';
+  var days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  for (var d = 0; d < days.length; d++) {
+    html += '<option>' + esc(days[d]) + '</option>';
+  }
+  html += '</select></div>';
+  html += '<div class="field"><label>Area</label><input type="text" id="addDivArea" placeholder="Area description"></div>';
+  html += '<div class="field"><label>Min</label><input type="number" id="addDivMin" value="5" style="width:60px"></div>';
+  html += '<div class="field"><label>Max</label><input type="number" id="addDivMax" value="8" style="width:60px"></div>';
+  html += '<button class="spm-btn spm-btn-primary" style="padding:8px 16px;font-size:0.85rem" onclick="addDiv()">Add</button>';
+  html += '</div>';
+
+  // Table
+  html += '<div class="table-wrap"><table class="admin-table">';
+  html += '<thead><tr><th>ID</th><th>Format</th><th>Day</th><th>Area</th><th>Min</th><th>Max</th><th>Active</th><th></th></tr></thead>';
+  html += '<tbody>';
+
+  for (var i = 0; i < divs.length; i++) {
+    var div = divs[i];
+    html += '<tr>';
+    html += '<td>' + esc(div.divisionId) + '</td>';
+    html += '<td>' + esc(div.format) + '</td>';
+    html += '<td>' + esc(div.day) + '</td>';
+    html += '<td>' + esc(div.areaDescription) + '</td>';
+    html += '<td>' + esc(div.minRoster) + '</td>';
+    html += '<td>' + esc(div.maxRoster) + '</td>';
+    html += '<td>Yes</td>';
+    html += '<td><button class="spm-btn spm-btn-danger" style="padding:4px 12px;font-size:0.75rem" onclick="removeDiv(\'' + esc(div.divisionId) + '\')">Deactivate</button></td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  document.getElementById('tabDivisions').innerHTML = html;
+}
+
+function addDiv() {
+  var format = document.getElementById('addDivFormat').value;
+  var day = document.getElementById('addDivDay').value;
+  var area = document.getElementById('addDivArea').value.trim();
+  var min = document.getElementById('addDivMin').value;
+  var max = document.getElementById('addDivMax').value;
+
+  SPM.setStatus('Adding division...');
+  SPM.callServer('addDivision', {
+    divData: { format: format, day: day, areaDescription: area, minRoster: min, maxRoster: max }
+  }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    loadAdminData(); // Refresh
+  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+}
+
+function removeDiv(divId) {
+  if (!confirm('Deactivate this division?')) return;
+
+  SPM.setStatus('Deactivating...');
+  SPM.callServer('removeDivision', { divisionId: divId }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    loadAdminData();
+  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+}
+
+// ── Requests Tab ───────────────────────────────────────────────────
+function renderRequests() {
+  var esc = SPM.esc;
+  var reqs = adminData.divisionRequests || [];
+
+  var html = '<h3 style="margin:0 0 12px">Division Requests</h3>';
+
+  if (reqs.length === 0) {
+    html += '<div style="color:var(--muted);padding:20px;text-align:center">No requests yet.</div>';
+  }
+
+  for (var i = 0; i < reqs.length; i++) {
+    var req = reqs[i];
+    html += '<div class="request-item">';
+    html += '<div class="req-meta">From APA #' + esc(req.requestedBy) + ' &middot; ' + esc(req.timestamp) + ' &middot; ' + esc(req.status) + '</div>';
+    html += '<div class="req-text">' + esc(req.requestText) + '</div>';
+    html += '</div>';
+  }
+
+  document.getElementById('tabRequests').innerHTML = html;
+}
+
+// ── Config Tab ─────────────────────────────────────────────────────
+function renderConfig() {
+  var esc = SPM.esc;
+  var config = adminData.config || {};
+
+  var html = '<h3 style="margin:0 0 12px">Settings</h3>';
+
+  // Registration open
+  html += '<div class="config-row">';
+  html += '<label>Registration Open</label>';
+  html += '<select id="cfgOpen">';
+  html += '<option value="yes"' + (config.RegistrationOpen !== 'no' ? ' selected' : '') + '>Yes</option>';
+  html += '<option value="no"' + (config.RegistrationOpen === 'no' ? ' selected' : '') + '>No</option>';
+  html += '</select>';
+  html += '<button class="spm-btn spm-btn-secondary" style="padding:6px 14px;font-size:0.8rem" onclick="saveConfig(\'RegistrationOpen\', document.getElementById(\'cfgOpen\').value)">Save</button>';
+  html += '</div>';
+
+  // Deadline
+  html += '<div class="config-row">';
+  html += '<label>Registration Deadline</label>';
+  html += '<input type="datetime-local" id="cfgDeadline" value="' + esc(config.RegistrationDeadline || '') + '">';
+  html += '<button class="spm-btn spm-btn-secondary" style="padding:6px 14px;font-size:0.8rem" onclick="saveConfig(\'RegistrationDeadline\', document.getElementById(\'cfgDeadline\').value)">Save</button>';
+  html += '</div>';
+
+  document.getElementById('tabConfig').innerHTML = html;
+}
+
+function saveConfig(key, value) {
+  SPM.setStatus('Saving...');
+  SPM.callServer('updateConfig', { key: key, value: value }).then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    SPM.setStatus('Saved!');
+    setTimeout(function() { SPM.setStatus(''); }, 2000);
+    // Update local config
+    if (adminData) adminData.config[key] = value;
+  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+loadAdminData();
+</script>
+</body>
+</html>
