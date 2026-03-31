@@ -225,6 +225,31 @@
       font-size: 0.85rem;
       min-height: 36px;
     }
+    .role-btns { display: flex; gap: 4px; }
+    .role-btn {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #fff;
+      color: var(--muted);
+      min-height: 32px;
+      min-width: 32px;
+      text-align: center;
+      transition: all 0.1s;
+    }
+    .role-btn.active-captain {
+      background: var(--spm-accent);
+      color: #fff;
+      border-color: var(--spm-accent);
+    }
+    .role-btn.active-cocaptain {
+      background: #6c757d;
+      color: #fff;
+      border-color: #6c757d;
+    }
     .roster-entry .remove-btn {
       background: none;
       border: none;
@@ -807,20 +832,21 @@ function buildRosterSection(title, roster, format) {
   html += '<span class="roster-count ' + countCls + '">' + esc(countText) + ' players</span>';
   html += '</div>';
 
-  // Player rows
+  // Player rows — Captain/Co-Captain are toggle buttons (one each max)
   for (var i = 0; i < roster.length; i++) {
     var p = roster[i];
     html += '<div class="roster-entry">';
     html += '<div class="roster-entry-name">';
-    html += esc(p.playerName) + ' (' + esc(p.memberNumber) + ')';
+    html += esc(p.playerName) + ' <small style="color:var(--muted)">#' + esc(p.memberNumber) + '</small>';
     if (p.manualEntry) html += '<span class="manual-badge">Unverified</span>';
     if (p.dupWarning) html += '<span class="dup-warning">' + esc(p.dupWarning) + '</span>';
     html += '</div>';
-    html += '<select onchange="setRole(' + i + ', this.value, \'' + format + '\')">';
-    html += '<option value="Player"' + (p.role === 'Player' ? ' selected' : '') + '>Player</option>';
-    html += '<option value="Captain"' + (p.role === 'Captain' ? ' selected' : '') + '>Captain</option>';
-    html += '<option value="Co-Captain"' + (p.role === 'Co-Captain' ? ' selected' : '') + '>Co-Captain</option>';
-    html += '</select>';
+    html += '<div class="role-btns">';
+    var cCls = p.role === 'Captain' ? ' active-captain' : '';
+    var ccCls = p.role === 'Co-Captain' ? ' active-cocaptain' : '';
+    html += '<button class="role-btn' + cCls + '" onclick="toggleRole(' + i + ', \'Captain\', \'' + format + '\')" title="Captain">C</button>';
+    html += '<button class="role-btn' + ccCls + '" onclick="toggleRole(' + i + ', \'Co-Captain\', \'' + format + '\')" title="Co-Captain">CC</button>';
+    html += '</div>';
     html += '<button class="remove-btn" onclick="removePlayer(' + i + ', \'' + format + '\')" title="Remove">&times;</button>';
     html += '</div>';
   }
@@ -846,10 +872,24 @@ function getRoster(format) {
   return currentRoster;
 }
 
-function setRole(index, role, format) {
+function toggleRole(index, role, format) {
   var roster = getRoster(format);
+
+  // If clicking the same role that's already set, clear it (back to Player)
+  if (roster[index].role === role) {
+    roster[index].role = 'Player';
+    renderRosterArea();
+    return;
+  }
+
+  // Clear this role from whoever currently has it (enforce one captain, one co-captain)
+  for (var i = 0; i < roster.length; i++) {
+    if (roster[i].role === role) roster[i].role = 'Player';
+  }
+
+  // Assign the role to the clicked player
   roster[index].role = role;
-  // No re-render needed — the select already shows the new value
+  renderRosterArea();
 }
 
 function removePlayer(index, format) {
