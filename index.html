@@ -536,10 +536,18 @@ function buildTeamCard(team, index) {
 
   // Compact meta line (always visible)
   if (team.isDjPair) {
-    var rosterCount = team.eightBallTeam.roster.length + team.nineBallTeam.roster.length;
+    // Count unique players across both rosters
+    var seen = {};
+    for (var u8 = 0; u8 < team.eightBallTeam.roster.length; u8++) {
+      seen[team.eightBallTeam.roster[u8].memberNumber] = true;
+    }
+    for (var u9 = 0; u9 < team.nineBallTeam.roster.length; u9++) {
+      seen[team.nineBallTeam.roster[u9].memberNumber] = true;
+    }
+    var uniqueCount = Object.keys(seen).length;
     html += '<div class="team-card-meta">' + esc(team.day) + ' &middot; ' +
       esc(team.eightBallTeam.venue || team.nineBallTeam.venue) +
-      ' &middot; ' + rosterCount + ' players</div>';
+      ' &middot; ' + uniqueCount + ' players</div>';
   } else {
     html += '<div class="team-card-meta">#' + esc(team.teamNumber) + ' &middot; ' +
       esc(team.day) + ' &middot; ' + esc(team.format) +
