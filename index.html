@@ -1232,23 +1232,42 @@ function addPlayer(format) {
   var raw = input.value.trim();
   if (!raw) return;
 
-  // Check if already on this roster
   var roster = getRoster(format);
   var normalized = raw.replace(/\D/g, '');
+
+  // Check max roster size
+  var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
+  if (max > 0 && roster.length >= max) {
+    alert('Roster is full (' + max + ' players max).');
+    return;
+  }
+
+  // Check if already on THIS roster
   for (var i = 0; i < roster.length; i++) {
     if (roster[i].memberNumber === normalized) {
-      alert('This player is already on the roster.');
+      alert('This player is already on this roster.');
       return;
     }
   }
 
-  SPM.setStatus('Looking up #' + raw + '...');
+  // For DJ: also check the OTHER roster
+  if (currentFormIsDj) {
+    var otherRoster = (format === '8') ? currentRoster9 : currentRoster8;
+    for (var j = 0; j < otherRoster.length; j++) {
+      if (otherRoster[j].memberNumber === normalized) {
+        // Allowed — same player can be on both DJ rosters. No error.
+        break;
+      }
+    }
+  }
+
+  showLoading('Looking up #' + raw + '...');
 
   SPM.callServer('lookupMember', { memberNumber: raw }).then(function(data) {
-    SPM.setStatus('');
+    hideLoading();
     if (data.found) {
       roster.push({
-        memberNumber: data.found ? normalized : normalized,
+        memberNumber: normalized,
         playerName: data.playerName,
         role: 'Player',
         manualEntry: false
@@ -1272,7 +1291,7 @@ function addPlayer(format) {
         '</div>';
     }
   }).catch(function() {
-    SPM.setStatus('');
+    hideLoading();
     alert('Network error looking up player.');
   });
 }
@@ -1283,6 +1302,12 @@ function confirmManualEntry(format) {
   if (!name) { alert('Please enter the player name.'); return; }
 
   var roster = getRoster(format);
+  var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
+  if (max > 0 && roster.length >= max) {
+    alert('Roster is full (' + max + ' players max).');
+    return;
+  }
+
   roster.push({
     memberNumber: pendingManualApa,
     playerName: name,
