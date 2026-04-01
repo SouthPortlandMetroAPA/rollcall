@@ -866,10 +866,10 @@ function quickReRegister(teamIndex) {
     isReRegistration: true,
     registeredBy: currentPlayer.memberNumber,
     divisionId: divisionId,
-    isDjPair: pIsDj
+    isDjPair: team.isDjPair
   };
 
-  if (pIsDj) {
+  if (team.isDjPair) {
     payload.teamName = team.eightBallTeam.teamName || team.baseName;
     payload.hostLocation = team.eightBallTeam.venue || team.nineBallTeam.venue;
     payload.originalTeamNumber = team.eightBallTeam.teamNumber;
