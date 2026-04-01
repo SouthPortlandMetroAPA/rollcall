@@ -595,6 +595,16 @@ var currentFormOrigTeam = '';
 var currentFormOrigTeam9 = '';
 var currentFormIsDj = false;
 
+// ── Format display names ───────────────────────────────────────────
+// Backend stores short codes ("DJ", "DJ Doubles"). Display friendlier names.
+function formatDisplayName(fmt) {
+  var map = {
+    'DJ': 'Double Jeopardy',
+    'DJ Doubles': 'Double Jeopardy Doubles'
+  };
+  return map[fmt] || fmt;
+}
+
 // ── Short time display ─────────────────────────────────────────────
 // "6:30 PM" → "6:30p", "12:00 PM" → "12p", "1:00 PM" → "1p"
 function shortTimeStr(t) {
@@ -739,7 +749,7 @@ function buildTeamCard(team, index) {
   html += '<div class="team-card-header">';
   if (team.isDjPair) {
     html += '<div>';
-    html += '<span class="dj-label">DJ</span> ';
+    html += '<span class="dj-label">Double Jeopardy</span> ';
     html += '<span class="team-card-name">' + esc(team.eightBallTeam.teamName || team.baseName) + '</span>';
     html += '</div>';
   } else {
@@ -1062,14 +1072,14 @@ function renderRegForm(opts) {
     var fmtOrder = ['DJ', 'DJ Doubles', '8-Ball Open', '9-Ball Open', '8-Ball Doubles', '9-Ball Doubles', '8-Ball Ladies', 'Masters'];
     for (var fo = 0; fo < fmtOrder.length; fo++) {
       if (uniqueFormats[fmtOrder[fo]]) {
-        html += '<option value="' + esc(fmtOrder[fo]) + '">' + esc(fmtOrder[fo]) + '</option>';
+        html += '<option value="' + esc(fmtOrder[fo]) + '">' + esc(formatDisplayName(fmtOrder[fo])) + '</option>';
       }
     }
     // Any formats not in fmtOrder
     var fmtKeys = Object.keys(uniqueFormats).sort();
     for (var fk = 0; fk < fmtKeys.length; fk++) {
       if (fmtOrder.indexOf(fmtKeys[fk]) === -1) {
-        html += '<option value="' + esc(fmtKeys[fk]) + '">' + esc(fmtKeys[fk]) + '</option>';
+        html += '<option value="' + esc(fmtKeys[fk]) + '">' + esc(formatDisplayName(fmtKeys[fk])) + '</option>';
       }
     }
     html += '</select>';
@@ -1181,38 +1191,39 @@ function onFormatChange() {
 }
 
 function onDivisionChange() {
-  var select = document.getElementById('regDivision');
-  var selDay = select.value;  // "Monday" or ""
+  var daySelect = document.getElementById('regDivision');
+  var selDay = daySelect ? daySelect.value : '';
+  var fmtSelect = document.getElementById('regFormat');
+  var selFmt = fmtSelect ? fmtSelect.value : '';
 
   currentFormDivision = null;
   currentFormDayTime = selDay;
 
   if (selDay) {
-    // Find the first matching division to get min/max roster
-    // Also check if any format on this day is DJ
-    var hasDj = false;
+    // Find the division matching day + format (if format selected).
+    // For re-registration (no format dropdown), match by day + DJ state.
     for (var i = 0; i < availableDivisions.length; i++) {
       var d = availableDivisions[i];
-      if (d.day === selDay) {
-        if (!currentFormDivision) currentFormDivision = d;
-        var fmt = d.format.toLowerCase();
-        if (fmt.indexOf('dj') !== -1) hasDj = true;
-      }
+      if (d.day !== selDay) continue;
+      if (selFmt && d.format !== selFmt) continue;
+      // For re-reg without format dropdown, match DJ state
+      if (!selFmt && currentFormIsDj !== (d.format.toLowerCase().indexOf('dj') !== -1)) continue;
+      currentFormDivision = d;
+      break;
     }
-
-    if (hasDj !== currentFormIsDj) {
-      currentFormIsDj = hasDj;
-      if (hasDj) {
-        currentRoster8 = currentRoster.slice();
-        currentRoster9 = [];
-        currentRoster = [];
-      } else {
-        currentRoster = currentRoster8.slice();
-        currentRoster8 = [];
-        currentRoster9 = [];
+    // Fallback: first division on this day
+    if (!currentFormDivision) {
+      for (var j = 0; j < availableDivisions.length; j++) {
+        if (availableDivisions[j].day === selDay) {
+          currentFormDivision = availableDivisions[j];
+          break;
+        }
       }
     }
   }
+
+  // DJ state is set by onFormatChange for new teams, or by startReRegister
+  // for re-registration. Don't override it here.
 
   renderRosterArea();
 }
