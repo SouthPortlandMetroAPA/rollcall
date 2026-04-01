@@ -1106,7 +1106,12 @@ function renderRegForm(opts) {
       }
       if (bestMatch) break;
     }
-    preselValue = bestMatch || dayMatch;
+    // Convert space-keyed dtKey to pipe-separated optVal format
+    var matched = bestMatch || dayMatch;
+    if (matched) {
+      var mc = byDayTime[matched];
+      preselValue = mc.day + '|' + mc.time;
+    }
   }
 
   for (var dt = 0; dt < dtKeys.length; dt++) {
