@@ -589,7 +589,29 @@ function renderConfig() {
   html += '<button class="spm-btn spm-btn-secondary" style="padding:6px 14px;font-size:0.8rem" onclick="saveConfig(\'RegistrationDeadline\', document.getElementById(\'cfgDeadline\').value)">Save</button>';
   html += '</div>';
 
+  // Cache refresh
+  html += '<div class="config-row">';
+  html += '<label>Session Data Cache</label>';
+  html += '<button class="spm-btn spm-btn-primary" style="padding:6px 14px;font-size:0.8rem" onclick="refreshCache()">Refresh Cache</button>';
+  html += '<span id="cacheStatus" style="font-size:0.8rem;color:var(--muted);margin-left:8px">Copies player data, rosters, and divisions from the current session into RollCall for fast lookups.</span>';
+  html += '</div>';
+
   document.getElementById('tabConfig').innerHTML = html;
+}
+
+function refreshCache() {
+  SPM.setStatus('Refreshing cache (this takes ~10s)...');
+  SPM.callServer('refreshCache').then(function(data) {
+    SPM.setStatus('');
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    var r = data.results;
+    document.getElementById('cacheStatus').textContent =
+      'Done! ' + r.players + ' players, ' + r.activeTeams + ' roster rows, ' +
+      r.divisions + ' divisions cached (' + (data._timing ? data._timing.total + 'ms' : '') + ')';
+  }).catch(function() {
+    SPM.setStatus('');
+    alert('Network error.');
+  });
 }
 
 function saveConfig(key, value) {
