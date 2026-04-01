@@ -13,6 +13,38 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="https://southportlandmetroapa.github.io/shared/spm-base.css">
   <style>
+    /* ── Header (match PatchCheck/MultiPass branding) ─────────────── */
+    .spm-header .title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      line-height: 1.08;
+      margin: 0;
+    }
+    .spm-header .subtitle-group {
+      display: inline-block;
+      margin-top: 8px;
+    }
+    .spm-header .subtitle {
+      font-size: 1.6rem;
+      font-weight: 400;
+      font-style: italic;
+      opacity: 0.95;
+      margin: 0;
+    }
+    .spm-header .app-pill {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 3px 14px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.5);
+    }
+
     /* ── Auth Screen ──────────────────────────────────────────────── */
     .auth-wrap {
       max-width: 480px;
@@ -443,9 +475,11 @@
 
   <!-- ═══ Header ═══ -->
   <div class="spm-header">
-    <div class="spm-subtitle">South Portland Metro APA</div>
-    <h1>RollCall</h1>
-    <div class="spm-subtitle">Session Registration</div>
+    <h1 class="title">South Portland Metro APA</h1>
+    <div class="subtitle-group">
+      <div class="subtitle">RollCall</div>
+      <div class="app-pill">Session Registration</div>
+    </div>
   </div>
 
   <!-- ═══ Screen: Auth ═══ -->
