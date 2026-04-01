@@ -941,9 +941,7 @@ function doSwitchStatus(teamIndex, newStatus) {
   var team = currentTeams[teamIndex];
   var name = team.isDjPair ? (team.eightBallTeam.teamName || team.baseName) : team.teamName;
 
-  var label = newStatus === 'not_returning' ? 'Not Returning' : 'Registered';
-  if (!confirm('Mark "' + name + '" as ' + label + '?')) return;
-
+  // No confirm() — the action modal already serves as confirmation.
   var payload = {
     memberNumber: currentPlayer.memberNumber,
     newStatus: newStatus
@@ -1249,7 +1247,8 @@ function buildRosterSection(title, roster, format) {
   var min = currentFormDivision ? currentFormDivision.minRoster : 0;
   var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
   var countCls = (min > 0 && roster.length < min) ? 'under' : 'ok';
-  var countText = roster.length + (min || max ? ' / ' + min + '-' + max : '');
+  var rangeText = (min && max && min === max) ? String(min) : (min + '-' + max);
+  var countText = roster.length + (min || max ? ' / ' + rangeText : '');
 
   var html = '<div class="roster-section">';
   html += '<div class="roster-section-title">';
