@@ -1510,14 +1510,14 @@ function submitRegistration() {
 // ── Confirmation Screen ────────────────────────────────────────────
 function showConfirmation(data) {
   var esc = SPM.esc;
-  var html = '<div class="spm-card confirm-card">';
-  html += '<div class="checkmark">&#10003;</div>';
-  html += '<h2>Registration Submitted!</h2>';
-  html += '<p><strong>' + esc(data.teamName) + '</strong></p>';
-  html += '<p>' + esc(data.format) + ' &middot; ' + esc(data.day) + '</p>';
+
+  // Show success in the action modal as a popup, then return to dashboard
+  var html = '<div style="font-size:3rem;color:#28a745;margin-bottom:12px">&#10003;</div>';
+  html += '<div class="action-modal-title">Registration Submitted!</div>';
+  html += '<div class="action-modal-meta">' + esc(data.teamName) + ' &middot; ' + esc(data.day) + '</div>';
 
   if (data.warnings && data.warnings.length > 0) {
-    html += '<div class="confirm-warnings">';
+    html += '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:8px;margin-top:12px;text-align:left;font-size:0.8rem">';
     html += '<strong>Warnings:</strong><br>';
     for (var i = 0; i < data.warnings.length; i++) {
       html += esc(data.warnings[i]) + '<br>';
@@ -1525,14 +1525,16 @@ function showConfirmation(data) {
     html += '</div>';
   }
 
-  html += '<div class="action-bar" style="justify-content:center;margin-top:20px">';
-  html += '<button class="spm-btn spm-btn-primary" onclick="doLookup()">Back to Dashboard</button>';
-  html += '<button class="spm-btn spm-btn-secondary" onclick="showNewTeamForm()">Register Another Team</button>';
-  html += '</div>';
-  html += '</div>';
+  document.getElementById('actionModalTitle').textContent = '';
+  document.getElementById('actionModalMeta').innerHTML = '';
+  document.getElementById('actionModalBtns').innerHTML = html;
+  document.getElementById('actionModal').classList.add('active');
 
-  document.getElementById('screenConfirm').innerHTML = html;
-  showScreen('screenConfirm');
+  // Auto-refresh dashboard after brief delay
+  setTimeout(function() {
+    hideActionModal();
+    doLookup();
+  }, 2000);
 }
 
 // ── Request Division Screen ────────────────────────────────────────
