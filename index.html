@@ -427,6 +427,43 @@
     }
     .action-bar .spm-btn { flex: 1; min-width: 140px; }
 
+    /* ── Toast Notification ───────────────────────────────────────── */
+    .toast-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    }
+    .toast-overlay.active { display: flex; }
+    .toast-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px 28px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      max-width: 360px;
+      width: 100%;
+    }
+    .toast-icon {
+      font-size: 2.5rem;
+      margin-bottom: 8px;
+    }
+    .toast-icon.error { color: var(--spm-primary); }
+    .toast-icon.success { color: #28a745; }
+    .toast-icon.warn { color: #ffc107; }
+    .toast-msg {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+    .toast-box .spm-btn { min-width: 120px; }
+
     /* ── Loading Modal ────────────────────────────────────────────── */
     .loading { text-align: center; padding: 40px; color: var(--muted); }
     .loading-modal {
@@ -531,7 +568,7 @@
       </div>
       <div class="action-bar">
         <button class="spm-btn spm-btn-primary" onclick="submitRequest()">Submit Request</button>
-        <button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Cancel</button>
+        <button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Back</button>
       </div>
     </div>
   </div>
@@ -548,7 +585,16 @@
     <div class="action-modal-title" id="actionModalTitle"></div>
     <div class="action-modal-meta" id="actionModalMeta"></div>
     <div class="action-modal-btns" id="actionModalBtns"></div>
-    <div class="action-modal-close"><button onclick="hideActionModal()">Cancel</button></div>
+    <div class="action-modal-close"><button onclick="hideActionModal()">Close</button></div>
+  </div>
+</div>
+
+<!-- ═══ Toast Notification ═══ -->
+<div class="toast-overlay" id="toastOverlay">
+  <div class="toast-box">
+    <div class="toast-icon" id="toastIcon"></div>
+    <div class="toast-msg" id="toastMsg"></div>
+    <button class="spm-btn spm-btn-primary" onclick="hideToast()">OK</button>
   </div>
 </div>
 
@@ -613,6 +659,26 @@ function shortTimeStr(t) {
   if (!m) return t;
   var hr = m[1], min = m[2], ampm = m[3].toLowerCase().charAt(0);
   return min === '00' ? hr + ampm : hr + ':' + min + ampm;
+}
+
+// ── Toast notification (replaces all alert/confirm) ────────────────
+// type: 'error', 'success', 'warn'
+function showToast(msg, type, callback) {
+  var icons = { error: '&#10007;', success: '&#10003;', warn: '&#9888;' };
+  document.getElementById('toastIcon').innerHTML = icons[type] || icons.warn;
+  document.getElementById('toastIcon').className = 'toast-icon ' + (type || 'warn');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastOverlay').classList.add('active');
+  window._toastCallback = callback || null;
+}
+function hideToast() {
+  document.getElementById('toastOverlay').classList.remove('active');
+  if (window._toastCallback) { var cb = window._toastCallback; window._toastCallback = null; cb(); }
+}
+// Auto-dismiss success toasts after 2s
+function showSuccessToast(msg, callback) {
+  showToast(msg, 'success');
+  setTimeout(function() { hideToast(); if (callback) callback(); }, 2000);
 }
 
 // ── Loading modal ──────────────────────────────────────────────────
@@ -859,7 +925,7 @@ function quickReRegister(teamIndex) {
   }
 
   if (!divisionId) {
-    alert('No matching division found for ' + day + '. Please use "Re-Register with Changes".');
+    showToast('No matching division found for ' + day + '. Please use "Re-Register with Changes".', 'error');
     return;
   }
 
@@ -913,11 +979,11 @@ function quickReRegister(teamIndex) {
   showLoading('Registering same team...');
   SPM.callServer('registerTeam', payload).then(function(data) {
     hideLoading();
-    if (!data.success) { alert(data.error || 'Registration failed.'); return; }
+    if (!data.success) { showToast(data.error || 'Registration failed.', 'error'); return; }
     showConfirmation(data);
   }).catch(function() {
     hideLoading();
-    alert('Network error. Please try again.');
+    showToast('Network error. Please try again.', 'error');
   });
 }
 
@@ -965,11 +1031,11 @@ function doSwitchStatus(teamIndex, newStatus) {
   showLoading('Updating...');
   SPM.callServer('switchStatus', payload).then(function(data) {
     hideLoading();
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    if (!data.success) { showToast(data.error || 'Failed.', 'error'); return; }
     doLookup();
   }).catch(function() {
     hideLoading();
-    alert('Network error.');
+    showToast('Network error.', 'error');
   });
 }
 
@@ -1123,7 +1189,7 @@ function renderRegForm(opts) {
   // Submit
   html += '<div class="action-bar">';
   html += '<button class="spm-btn spm-btn-primary" id="submitRegBtn" onclick="submitRegistration()">Submit Registration</button>';
-  html += '<button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Cancel</button>';
+  html += '<button class="spm-btn spm-btn-secondary" onclick="showDashboard()">Back</button>';
   html += '</div>';
 
   document.getElementById('regFormContent').innerHTML = html;
@@ -1335,14 +1401,14 @@ function addPlayer(format) {
   // Check max roster size
   var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
   if (max > 0 && roster.length >= max) {
-    alert('Roster is full (' + max + ' players max).');
+    showToast('Roster is full (' + max + ' players max).', 'warn');
     return;
   }
 
   // Check if already on THIS roster
   for (var i = 0; i < roster.length; i++) {
     if (roster[i].memberNumber === normalized) {
-      alert('This player is already on this roster.');
+      showToast('This player is already on this roster.', 'warn');
       return;
     }
   }
@@ -1389,19 +1455,19 @@ function addPlayer(format) {
     }
   }).catch(function() {
     hideLoading();
-    alert('Network error looking up player.');
+    showToast('Network error looking up player.', 'error');
   });
 }
 
 function confirmManualEntry(format) {
   var nameInput = document.getElementById('manualNameInput' + format);
   var name = nameInput.value.trim();
-  if (!name) { alert('Please enter the player name.'); return; }
+  if (!name) { showToast('Please enter the player name.', 'warn'); return; }
 
   var roster = getRoster(format);
   var max = currentFormDivision ? currentFormDivision.maxRoster : 0;
   if (max > 0 && roster.length >= max) {
-    alert('Roster is full (' + max + ' players max).');
+    showToast('Roster is full (' + max + ' players max).', 'warn');
     return;
   }
 
@@ -1437,9 +1503,9 @@ function submitRegistration() {
   var fmtSelect = document.getElementById('regFormat');
   var selFmt = fmtSelect ? fmtSelect.value : '';
 
-  if (!teamName) { alert('Team name is required.'); return; }
-  if (!currentFormIsReReg && !selFmt) { alert('Please select a format.'); return; }
-  if (!selDay) { alert('Please select a day of play.'); return; }
+  if (!teamName) { showToast('Team name is required.', 'warn'); return; }
+  if (!currentFormIsReReg && !selFmt) { showToast('Please select a format.', 'warn'); return; }
+  if (!selDay) { showToast('Please select a day of play.', 'warn'); return; }
 
   // Resolve day (+ format for new teams) to a division ID.
   var divisionId = '';
@@ -1450,7 +1516,7 @@ function submitRegistration() {
     divisionId = ad.divisionId;
     break;
   }
-  if (!divisionId) { alert('No matching division found.'); return; }
+  if (!divisionId) { showToast('No matching division found.', 'error'); return; }
 
   // Build payload
   var payload = {
@@ -1496,7 +1562,7 @@ function submitRegistration() {
     document.getElementById('submitRegBtn').disabled = false;
 
     if (!data.success) {
-      alert(data.error || 'Registration failed.');
+      showToast(data.error || 'Registration failed.', 'error');
       return;
     }
 
@@ -1504,7 +1570,7 @@ function submitRegistration() {
   }).catch(function() {
     hideLoading();
     document.getElementById('submitRegBtn').disabled = false;
-    alert('Network error. Please try again.');
+    showToast('Network error. Please try again.', 'error');
   });
 }
 
@@ -1546,7 +1612,7 @@ function showRequestForm() {
 
 function submitRequest() {
   var text = document.getElementById('requestText').value.trim();
-  if (!text) { alert('Please describe the division you want.'); return; }
+  if (!text) { showToast('Please describe the division you want.', 'warn'); return; }
 
   SPM.setStatus('Submitting request...');
   SPM.callServer('requestDivision', {
@@ -1554,12 +1620,12 @@ function submitRequest() {
     requestText: text
   }).then(function(data) {
     SPM.setStatus('');
-    if (!data.success) { alert(data.error || 'Request failed.'); return; }
-    alert('Your division request has been submitted. Thank you!');
+    if (!data.success) { showToast(data.error || 'Request failed.', 'error'); return; }
+    showSuccessToast('Division request submitted!', function() { showDashboard(); });
     showDashboard();
   }).catch(function() {
     SPM.setStatus('');
-    alert('Network error.');
+    showToast('Network error.', 'error');
   });
 }
 </script>

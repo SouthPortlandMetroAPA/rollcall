@@ -82,7 +82,7 @@
     }
     .admin-table tr:hover td { background: #f8f9fa; }
     .admin-table .status-submitted { color: #28a745; font-weight: 600; }
-    .admin-table .status-cancelled { color: #dc3545; text-decoration: line-through; }
+    .admin-table .status-not-returning { color: #dc3545; font-style: italic; }
 
     /* ── Expandable roster ─────────────────────────────────────────── */
     .roster-toggle {
@@ -331,7 +331,7 @@ function renderRegistrations() {
   html += '</select>';
 
   html += '<select id="filterStatus" onchange="renderRegistrations()"><option value="">All Status</option>';
-  html += '<option value="submitted">Submitted</option><option value="cancelled">Cancelled</option></select>';
+  html += '<option value="submitted">Submitted</option><option value="not_returning">Not Returning</option></select>';
   html += '<button class="spm-btn spm-btn-secondary" style="padding:6px 14px;font-size:0.8rem" onclick="exportCsv()">&#8595; CSV</button>';
   html += '</div>';
 
@@ -363,7 +363,7 @@ function renderRegistrations() {
   for (var t = 0; t < filtered.length; t++) {
     var reg = filtered[t];
     var regRoster = rosterByReg[reg.registrationId] || [];
-    var statusCls = reg.status === 'cancelled' ? 'status-cancelled' : 'status-submitted';
+    var statusCls = reg.status === 'not_returning' ? 'status-not-returning' : 'status-submitted';
 
     html += '<tr>';
     html += '<td>' + esc(reg.teamName) + (reg.isReRegistration === 'yes' ? ' <small>(re-reg #' + esc(reg.originalTeamNumber) + ')</small>' : '') + '</td>';
@@ -527,20 +527,20 @@ function addDiv() {
     divData: { format: format, day: day, areaDescription: area, minRoster: min, maxRoster: max }
   }).then(function(data) {
     SPM.setStatus('');
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    if (!data.success) { SPM.setStatus(data.error || 'Failed.'); return; }
     loadAdminData(); // Refresh
-  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+  }).catch(function() { SPM.setStatus('Network error.'); });
 }
 
 function removeDiv(divId) {
-  if (!confirm('Deactivate this division?')) return;
+  // No confirm — admin action is intentional
 
   SPM.setStatus('Deactivating...');
   SPM.callServer('removeDivision', { divisionId: divId }).then(function(data) {
     SPM.setStatus('');
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    if (!data.success) { SPM.setStatus(data.error || 'Failed.'); return; }
     loadAdminData();
-  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+  }).catch(function() { SPM.setStatus('Network error.'); });
 }
 
 // ── Requests Tab ───────────────────────────────────────────────────
@@ -603,14 +603,14 @@ function refreshCache() {
   SPM.setStatus('Refreshing cache (this takes ~10s)...');
   SPM.callServer('refreshCache').then(function(data) {
     SPM.setStatus('');
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    if (!data.success) { SPM.setStatus(data.error || 'Failed.'); return; }
     var r = data.results;
     document.getElementById('cacheStatus').textContent =
       'Done! ' + r.players + ' players, ' + r.activeTeams + ' roster rows, ' +
       r.divisions + ' divisions cached (' + (data._timing ? data._timing.total + 'ms' : '') + ')';
   }).catch(function() {
     SPM.setStatus('');
-    alert('Network error.');
+    SPM.setStatus('Network error.');
   });
 }
 
@@ -618,12 +618,12 @@ function saveConfig(key, value) {
   SPM.setStatus('Saving...');
   SPM.callServer('updateConfig', { key: key, value: value }).then(function(data) {
     SPM.setStatus('');
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    if (!data.success) { SPM.setStatus(data.error || 'Failed.'); return; }
     SPM.setStatus('Saved!');
     setTimeout(function() { SPM.setStatus(''); }, 2000);
     // Update local config
     if (adminData) adminData.config[key] = value;
-  }).catch(function() { SPM.setStatus(''); alert('Network error.'); });
+  }).catch(function() { SPM.setStatus('Network error.'); });
 }
 
 // ── Init ───────────────────────────────────────────────────────────
