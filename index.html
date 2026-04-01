@@ -108,9 +108,65 @@
       background: #d4edda;
       color: #155724;
     }
-    .badge-not-registered {
+    .badge-not-returning {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .badge-pending {
       background: #e9ecef;
       color: #495057;
+    }
+
+    /* ── Action Modal (team click popup) ──────────────────────────── */
+    .action-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
+      padding: 20px;
+    }
+    .action-modal.active { display: flex; }
+    .action-modal-box {
+      background: #fff;
+      border-radius: 22px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+    .action-modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .action-modal-meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .action-modal-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .action-modal-btns .spm-btn {
+      width: 100%;
+      text-align: center;
+    }
+    .action-modal-close {
+      margin-top: 12px;
+      text-align: center;
+    }
+    .action-modal-close button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 8px 16px;
     }
     .dj-label {
       background: linear-gradient(135deg, var(--spm-primary), var(--spm-accent));
@@ -452,6 +508,16 @@
   <div class="spm-footer">South Portland Metro APA &middot; RollCall</div>
 </div>
 
+<!-- ═══ Action Modal (team click popup) ═══ -->
+<div class="action-modal" id="actionModal">
+  <div class="action-modal-box">
+    <div class="action-modal-title" id="actionModalTitle"></div>
+    <div class="action-modal-meta" id="actionModalMeta"></div>
+    <div class="action-modal-btns" id="actionModalBtns"></div>
+    <div class="action-modal-close"><button onclick="hideActionModal()">Cancel</button></div>
+  </div>
+</div>
+
 <!-- ═══ Loading Modal (overlay) ═══ -->
 <div class="loading-modal" id="loadingModal">
   <div class="loading-modal-box">
@@ -610,10 +676,24 @@ function renderDashboard() {
 
 function buildTeamCard(team, index) {
   var esc = SPM.esc;
-  var isRegistered = !!team.registrationStatus;
+  var status = team.registrationStatus;  // "submitted", "not_returning", or null
 
-  // Compact card — click to expand detail
-  var html = '<div class="team-card" onclick="toggleDetail(' + index + ')">';
+  // Badge class and label
+  var badgeCls, badgeLabel;
+  if (status === 'submitted') {
+    badgeCls = 'badge-registered'; badgeLabel = 'Registered';
+  } else if (status === 'not_returning') {
+    badgeCls = 'badge-not-returning'; badgeLabel = 'Not Returning';
+  } else {
+    badgeCls = 'badge-pending'; badgeLabel = 'Pending';
+  }
+
+  // Clicking card opens action modal (captains) or expands detail (non-captains)
+  var clickAction = (registrationOpen && team.canRegister)
+    ? 'showActionModal(' + index + ')'
+    : 'toggleDetail(' + index + ')';
+
+  var html = '<div class="team-card" onclick="' + clickAction + '">';
 
   // Header row: name + status badge
   html += '<div class="team-card-header">';
@@ -625,20 +705,14 @@ function buildTeamCard(team, index) {
   } else {
     html += '<span class="team-card-name">' + esc(team.teamName) + '</span>';
   }
-  html += '<span class="spm-badge ' + (isRegistered ? 'badge-registered' : 'badge-not-registered') + '">' +
-    (isRegistered ? 'Registered' : 'Not Registered') + '</span>';
+  html += '<span class="spm-badge ' + badgeCls + '">' + badgeLabel + '</span>';
   html += '</div>';
 
   // Compact meta line (always visible)
   if (team.isDjPair) {
-    // Count unique players across both rosters
     var seen = {};
-    for (var u8 = 0; u8 < team.eightBallTeam.roster.length; u8++) {
-      seen[team.eightBallTeam.roster[u8].memberNumber] = true;
-    }
-    for (var u9 = 0; u9 < team.nineBallTeam.roster.length; u9++) {
-      seen[team.nineBallTeam.roster[u9].memberNumber] = true;
-    }
+    for (var u8 = 0; u8 < team.eightBallTeam.roster.length; u8++) seen[team.eightBallTeam.roster[u8].memberNumber] = true;
+    for (var u9 = 0; u9 < team.nineBallTeam.roster.length; u9++) seen[team.nineBallTeam.roster[u9].memberNumber] = true;
     var uniqueCount = Object.keys(seen).length;
     html += '<div class="team-card-meta">' + esc(team.day) + ' &middot; ' +
       esc(team.eightBallTeam.venue || team.nineBallTeam.venue) +
@@ -649,11 +723,9 @@ function buildTeamCard(team, index) {
       ' &middot; ' + team.roster.length + ' players</div>';
   }
 
-  // Expandable detail section
+  // Expandable detail (for non-captains, or when accessed via action modal)
   html += '<div class="team-detail" id="detail-' + index + '">';
-
   if (team.isDjPair) {
-    // DJ rosters side by side on desktop, stacked on mobile
     html += '<div class="dj-columns">';
     html += '<div class="dj-sub">';
     html += '<div class="dj-sub-label">8-Ball &middot; Team #' + esc(team.eightBallTeam.teamNumber) + '</div>';
@@ -668,19 +740,8 @@ function buildTeamCard(team, index) {
     html += '<div class="team-card-meta">' + esc(team.venue) + '</div>';
     html += buildRosterSummary(team.roster);
   }
-
-  // Action buttons (inside detail)
-  if (registrationOpen && team.canRegister && !isRegistered) {
-    html += '<div class="action-bar">';
-    html += '<button class="spm-btn spm-btn-primary" onclick="event.stopPropagation();startReRegister(' + index + ')">Re-Register This Team</button>';
-    html += '</div>';
-  } else if (registrationOpen && isRegistered) {
-    html += '<div class="action-bar">';
-    html += '<button class="spm-btn spm-btn-danger" onclick="event.stopPropagation();cancelReg(\'' + esc(team.registrationId || team.djPairId || '') + '\')">Cancel Registration</button>';
-    html += '</div>';
-  }
-
   html += '</div>'; // end detail
+
   html += '</div>'; // end card
   return html;
 }
@@ -688,6 +749,158 @@ function buildTeamCard(team, index) {
 function toggleDetail(index) {
   var el = document.getElementById('detail-' + index);
   if (el) el.classList.toggle('open');
+}
+
+// ── Action Modal (team click popup for captains) ───────────────────
+function showActionModal(index) {
+  var team = currentTeams[index];
+  var esc = SPM.esc;
+  var status = team.registrationStatus;
+
+  var name = team.isDjPair ? (team.eightBallTeam.teamName || team.baseName) : team.teamName;
+  var meta = team.day;
+  if (team.isDjPair) {
+    meta += ' &middot; ' + esc(team.eightBallTeam.venue || team.nineBallTeam.venue);
+  } else {
+    meta += ' &middot; ' + esc(team.format) + ' &middot; ' + esc(team.venue);
+  }
+
+  document.getElementById('actionModalTitle').textContent = name;
+  document.getElementById('actionModalMeta').innerHTML = meta;
+
+  var btnsHtml = '';
+
+  if (status === 'submitted') {
+    // Already registered — show cancel option
+    var regId = team.registrationId || team.djPairId || '';
+    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();cancelReg(\'' + esc(regId) + '\')">Cancel Registration</button>';
+  } else if (status === 'not_returning') {
+    // Already marked not returning — show undo
+    var regId2 = team.registrationId || team.djPairId || '';
+    btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();cancelReg(\'' + esc(regId2) + '\')">Undo Not Returning</button>';
+  } else {
+    // Pending — show all three options
+    btnsHtml += '<button class="spm-btn spm-btn-primary" onclick="hideActionModal();quickReRegister(' + index + ')">Re-Register (Same Team)</button>';
+    btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();startReRegister(' + index + ')">Re-Register with Changes</button>';
+    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();markNotReturning(' + index + ')">Not Returning</button>';
+  }
+
+  document.getElementById('actionModalBtns').innerHTML = btnsHtml;
+  document.getElementById('actionModal').classList.add('active');
+}
+
+function hideActionModal() {
+  document.getElementById('actionModal').classList.remove('active');
+}
+
+// ── Quick Re-Register (same team, no changes) ─────────────────────
+function quickReRegister(teamIndex) {
+  var team = currentTeams[teamIndex];
+
+  // Find matching division from availableDivisions by day + format
+  var divisionId = '';
+  var pIsDj = team.isDjPair;
+  var day = team.day;
+
+  for (var i = 0; i < availableDivisions.length; i++) {
+    var d = availableDivisions[i];
+    if (d.day !== day) continue;
+    var fmt = d.format.toLowerCase();
+    if (pIsDj && fmt.indexOf('dj') !== -1) { divisionId = d.divisionId; break; }
+    if (!pIsDj && team.format && fmt.indexOf(team.format.toLowerCase().split(' ')[0]) !== -1) { divisionId = d.divisionId; break; }
+  }
+
+  if (!divisionId) {
+    // Fallback: first division matching day
+    for (var j = 0; j < availableDivisions.length; j++) {
+      if (availableDivisions[j].day === day) { divisionId = availableDivisions[j].divisionId; break; }
+    }
+  }
+
+  if (!divisionId) {
+    alert('No matching division found for ' + day + '. Please use "Re-Register with Changes".');
+    return;
+  }
+
+  var payload = {
+    isReRegistration: true,
+    registeredBy: currentPlayer.memberNumber,
+    divisionId: divisionId,
+    isDjPair: pIsDj
+  };
+
+  if (pIsDj) {
+    payload.teamName = team.eightBallTeam.teamName || team.baseName;
+    payload.hostLocation = team.eightBallTeam.venue || team.nineBallTeam.venue;
+    payload.originalTeamNumber = team.eightBallTeam.teamNumber;
+
+    // Extract captains from rosters
+    var capt8 = '', coCapt8 = '', capt9 = '', coCapt9 = '';
+    for (var r8 = 0; r8 < team.eightBallTeam.roster.length; r8++) {
+      if (team.eightBallTeam.roster[r8].role === 'Captain') capt8 = team.eightBallTeam.roster[r8].memberNumber;
+      if (team.eightBallTeam.roster[r8].role === 'Co-Captain') coCapt8 = team.eightBallTeam.roster[r8].memberNumber;
+    }
+    for (var r9 = 0; r9 < team.nineBallTeam.roster.length; r9++) {
+      if (team.nineBallTeam.roster[r9].role === 'Captain') capt9 = team.nineBallTeam.roster[r9].memberNumber;
+      if (team.nineBallTeam.roster[r9].role === 'Co-Captain') coCapt9 = team.nineBallTeam.roster[r9].memberNumber;
+    }
+    payload.captain = capt8 || capt9 || currentPlayer.memberNumber;
+    payload.coCaptain = coCapt8 || coCapt9 || '';
+    payload.eightBallRoster = team.eightBallTeam.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player' };
+    });
+    payload.nineBallRoster = team.nineBallTeam.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player' };
+    });
+  } else {
+    payload.teamName = team.teamName;
+    payload.hostLocation = team.venue;
+    payload.originalTeamNumber = team.teamNumber;
+    var capt = '', coCapt = '';
+    for (var rr = 0; rr < team.roster.length; rr++) {
+      if (team.roster[rr].role === 'Captain') capt = team.roster[rr].memberNumber;
+      if (team.roster[rr].role === 'Co-Captain') coCapt = team.roster[rr].memberNumber;
+    }
+    payload.captain = capt || currentPlayer.memberNumber;
+    payload.coCaptain = coCapt || '';
+    payload.roster = team.roster.map(function(p) {
+      return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player' };
+    });
+  }
+
+  showLoading('Registering same team...');
+  SPM.callServer('registerTeam', payload).then(function(data) {
+    hideLoading();
+    if (!data.success) { alert(data.error || 'Registration failed.'); return; }
+    showConfirmation(data);
+  }).catch(function() {
+    hideLoading();
+    alert('Network error. Please try again.');
+  });
+}
+
+// ── Mark Not Returning ─────────────────────────────────────────────
+function markNotReturning(teamIndex) {
+  var team = currentTeams[teamIndex];
+  var name = team.isDjPair ? (team.eightBallTeam.teamName || team.baseName) : team.teamName;
+  var origTeam = team.isDjPair ? team.eightBallTeam.teamNumber : team.teamNumber;
+
+  if (!confirm('Mark "' + name + '" as not returning next session?')) return;
+
+  showLoading('Updating...');
+  SPM.callServer('markNotReturning', {
+    memberNumber: currentPlayer.memberNumber,
+    teamName: name,
+    originalTeamNumber: origTeam,
+    day: team.day
+  }).then(function(data) {
+    hideLoading();
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
+    doLookup();  // Refresh dashboard
+  }).catch(function() {
+    hideLoading();
+    alert('Network error.');
+  });
 }
 
 function buildRosterSummary(roster) {
