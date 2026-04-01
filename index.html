@@ -821,7 +821,8 @@ function showActionModal(index) {
   var btnsHtml = '';
 
   if (status === 'submitted') {
-    // Registered → can switch to Not Returning
+    // Registered → can modify or switch to Not Returning
+    btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();startReRegister(' + index + ')">Re-Register with Changes</button>';
     btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();doSwitchStatus(' + index + ', \'not_returning\')">Not Returning</button>';
   } else if (status === 'not_returning') {
     // Not Returning → can switch to Registered
