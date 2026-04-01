@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RollCall — South Portland Metro APA</title>
+  <meta name="description" content="Register your team for the next South Portland Metro APA league session.">
+  <meta property="og:title" content="RollCall — Session Registration">
+  <meta property="og:description" content="Register your team for the next South Portland Metro APA league session. Re-register existing teams or sign up new ones.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://southportlandmetroapa.github.io/rollcall/">
+  <meta property="og:site_name" content="South Portland Metro APA">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="https://southportlandmetroapa.github.io/shared/spm-base.css">
   <style>
     /* ── Auth Screen ──────────────────────────────────────────────── */
@@ -380,6 +387,7 @@
 
   <!-- ═══ Header ═══ -->
   <div class="spm-header">
+    <div class="spm-subtitle">South Portland Metro APA</div>
     <h1>RollCall</h1>
     <div class="spm-subtitle">Session Registration</div>
   </div>
@@ -735,7 +743,8 @@ function startReRegister(teamIndex) {
       teamName: team.eightBallTeam.teamName || team.baseName,
       hostLocation: team.eightBallTeam.venue || team.nineBallTeam.venue,
       isDj: true,
-      preselDay: team.day
+      preselDay: team.day,
+      preselFormat: team.eightBallTeam.format || ''
     });
   } else {
     currentFormOrigTeam = team.teamNumber;
@@ -748,7 +757,8 @@ function startReRegister(teamIndex) {
       teamName: team.teamName,
       hostLocation: team.venue,
       isDj: false,
-      preselDay: team.day
+      preselDay: team.day,
+      preselFormat: team.format || ''
     });
   }
 
@@ -815,15 +825,34 @@ function renderRegForm(opts) {
     return dayOrder.indexOf(da.day) - dayOrder.indexOf(db.day);
   });
 
-  // Pre-select for re-registration based on team's current day
+  // Pre-select for re-registration based on team's current day + format.
+  // When multiple time slots exist for the same day (e.g., Sunday 1p, 2p, 7p),
+  // use the team's format to pick the right slot. DJ teams match slots that
+  // contain DJ format; Masters match Masters slots; etc.
   var preselValue = '';
   if (opts.preselDay) {
+    var bestMatch = '';
+    var dayMatch = '';
+    var pFmt = (opts.preselFormat || '').toLowerCase();
+    var pIsDj = opts.isDj || pFmt.indexOf('dj') !== -1;
+
     for (var ps = 0; ps < dtKeys.length; ps++) {
-      if (byDayTime[dtKeys[ps]].day === opts.preselDay) {
-        preselValue = dtKeys[ps];
-        break;
+      var psCombo = byDayTime[dtKeys[ps]];
+      if (psCombo.day !== opts.preselDay) continue;
+
+      // First day match as fallback
+      if (!dayMatch) dayMatch = dtKeys[ps];
+
+      // Check if formats overlap with team's format
+      var fmts = Object.keys(psCombo.formats);
+      for (var pf = 0; pf < fmts.length; pf++) {
+        var f = fmts[pf].toLowerCase();
+        if (pIsDj && f.indexOf('dj') !== -1) { bestMatch = dtKeys[ps]; break; }
+        if (pFmt && f.indexOf(pFmt.split(' ')[0]) !== -1) { bestMatch = dtKeys[ps]; break; }
       }
+      if (bestMatch) break;
     }
+    preselValue = bestMatch || dayMatch;
   }
 
   for (var dt = 0; dt < dtKeys.length; dt++) {
