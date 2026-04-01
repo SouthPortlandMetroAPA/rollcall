@@ -986,6 +986,7 @@ function startReRegister(teamIndex) {
       teamName: team.eightBallTeam.teamName || team.baseName,
       hostLocation: team.eightBallTeam.venue || team.nineBallTeam.venue,
       isDj: true,
+      isReReg: true,
       preselDay: team.day,
       preselFormat: team.eightBallTeam.format || ''
     });
@@ -1001,6 +1002,7 @@ function startReRegister(teamIndex) {
       teamName: team.teamName,
       hostLocation: team.venue,
       isDj: false,
+      isReReg: true,
       preselDay: team.day,
       preselFormat: team.format || ''
     });
@@ -1023,7 +1025,8 @@ function showNewTeamForm() {
     title: 'Register New Team',
     teamName: '',
     hostLocation: '',
-    isDj: false
+    isDj: false,
+    isReReg: false
   });
 
   showScreen('screenRegForm');
@@ -1042,29 +1045,60 @@ function renderRegForm(opts) {
   html += '<input type="text" id="regTeamName" value="' + esc(opts.teamName) + '">';
   html += '</div>';
 
-  // Division picker — day of play only
+  // For new teams: Format dropdown → Day dropdown (filtered by format)
+  // For re-registration: Day dropdown only (format implied by team)
+  var dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+  if (!opts.isReReg) {
+    // ── Format picker (new teams only) ──
+    html += '<div class="form-group">';
+    html += '<label>Format</label>';
+    html += '<select id="regFormat" onchange="onFormatChange()">';
+    html += '<option value="">-- Select --</option>';
+    var uniqueFormats = {};
+    for (var fi = 0; fi < availableDivisions.length; fi++) {
+      uniqueFormats[availableDivisions[fi].format] = true;
+    }
+    var fmtOrder = ['DJ', 'DJ Doubles', '8-Ball Open', '9-Ball Open', '8-Ball Doubles', '9-Ball Doubles', '8-Ball Ladies', 'Masters'];
+    for (var fo = 0; fo < fmtOrder.length; fo++) {
+      if (uniqueFormats[fmtOrder[fo]]) {
+        html += '<option value="' + esc(fmtOrder[fo]) + '">' + esc(fmtOrder[fo]) + '</option>';
+      }
+    }
+    // Any formats not in fmtOrder
+    var fmtKeys = Object.keys(uniqueFormats).sort();
+    for (var fk = 0; fk < fmtKeys.length; fk++) {
+      if (fmtOrder.indexOf(fmtKeys[fk]) === -1) {
+        html += '<option value="' + esc(fmtKeys[fk]) + '">' + esc(fmtKeys[fk]) + '</option>';
+      }
+    }
+    html += '</select>';
+    html += '</div>';
+  }
+
+  // ── Day of play picker (filtered by format for new teams) ──
   html += '<div class="form-group">';
   html += '<label>Day of Play</label>';
   html += '<select id="regDivision" onchange="onDivisionChange()">';
   html += '<option value="">-- Select --</option>';
 
-  var dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  var byDay = {};
-  for (var i = 0; i < availableDivisions.length; i++) {
-    var d = availableDivisions[i];
-    if (!byDay[d.day]) byDay[d.day] = { divIds: [], formats: {} };
-    byDay[d.day].divIds.push(d.divisionId);
-    byDay[d.day].formats[d.format] = true;
+  if (opts.isReReg) {
+    // Re-registration: show all days that have divisions
+    var byDay = {};
+    for (var i = 0; i < availableDivisions.length; i++) {
+      var d = availableDivisions[i];
+      if (!byDay[d.day]) byDay[d.day] = true;
+    }
+    var preselValue = opts.preselDay || '';
+    for (var di = 0; di < dayOrder.length; di++) {
+      var day = dayOrder[di];
+      if (!byDay[day]) continue;
+      var sel = (day === preselValue) ? ' selected' : '';
+      html += '<option value="' + esc(day) + '"' + sel + '>' + esc(day) + '</option>';
+    }
   }
+  // For new teams, day options are populated dynamically by onFormatChange()
 
-  var preselValue = opts.preselDay || '';
-
-  for (var di = 0; di < dayOrder.length; di++) {
-    var day = dayOrder[di];
-    if (!byDay[day]) continue;
-    var sel = (day === preselValue) ? ' selected' : '';
-    html += '<option value="' + esc(day) + '"' + sel + '>' + esc(day) + '</option>';
-  }
   html += '</select>';
   html += '</div>';
 
@@ -1092,6 +1126,58 @@ function renderRegForm(opts) {
 
   // Render roster(s)
   renderRosterArea();
+}
+
+// When format changes (new team only), repopulate day dropdown with
+// only the days that have divisions in the selected format.
+function onFormatChange() {
+  var fmtSelect = document.getElementById('regFormat');
+  var daySelect = document.getElementById('regDivision');
+  var selFmt = fmtSelect ? fmtSelect.value : '';
+
+  // Clear day options
+  daySelect.innerHTML = '<option value="">-- Select --</option>';
+
+  if (!selFmt) {
+    onDivisionChange();
+    return;
+  }
+
+  // Find days that have this format
+  var dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  var daysWithFormat = {};
+  for (var i = 0; i < availableDivisions.length; i++) {
+    if (availableDivisions[i].format === selFmt) {
+      daysWithFormat[availableDivisions[i].day] = true;
+    }
+  }
+
+  for (var d = 0; d < dayOrder.length; d++) {
+    if (daysWithFormat[dayOrder[d]]) {
+      var opt = document.createElement('option');
+      opt.value = dayOrder[d];
+      opt.textContent = dayOrder[d];
+      daySelect.appendChild(opt);
+    }
+  }
+
+  // Update DJ state based on format
+  var fmt = selFmt.toLowerCase();
+  var isDj = fmt.indexOf('dj') !== -1;
+  if (isDj !== currentFormIsDj) {
+    currentFormIsDj = isDj;
+    if (isDj) {
+      currentRoster8 = currentRoster.slice();
+      currentRoster9 = [];
+      currentRoster = [];
+    } else {
+      currentRoster = currentRoster8.slice();
+      currentRoster8 = [];
+      currentRoster9 = [];
+    }
+  }
+
+  onDivisionChange();
 }
 
 function onDivisionChange() {
@@ -1337,17 +1423,21 @@ function submitRegistration() {
   var selDay = divSelect ? divSelect.value : '';
   var hostLocation = document.getElementById('regHostLocation').value.trim();
 
+  var fmtSelect = document.getElementById('regFormat');
+  var selFmt = fmtSelect ? fmtSelect.value : '';
+
   if (!teamName) { alert('Team name is required.'); return; }
+  if (!currentFormIsReReg && !selFmt) { alert('Please select a format.'); return; }
   if (!selDay) { alert('Please select a day of play.'); return; }
 
-  // Resolve day to a division ID. Pick the first matching active division.
+  // Resolve day (+ format for new teams) to a division ID.
   var divisionId = '';
   for (var di = 0; di < availableDivisions.length; di++) {
     var ad = availableDivisions[di];
-    if (ad.day === selDay) {
-      divisionId = ad.divisionId;
-      break;
-    }
+    if (ad.day !== selDay) continue;
+    if (selFmt && ad.format !== selFmt) continue;
+    divisionId = ad.divisionId;
+    break;
   }
   if (!divisionId) { alert('No matching division found.'); return; }
 
