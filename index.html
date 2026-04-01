@@ -592,6 +592,7 @@ var currentFormDivision = null;   // selected division object
 var currentFormDayTime = '';      // "Monday|6:30 PM" — selected day+time
 var currentFormIsReReg = false;
 var currentFormOrigTeam = '';
+var currentFormOrigTeam9 = '';
 var currentFormIsDj = false;
 
 // ── Short time display ─────────────────────────────────────────────
@@ -649,6 +650,11 @@ function doLookup() {
     currentTeams = data.teams || [];
     registrationOpen = data.registrationOpen;
     registrationDeadline = data.deadline;
+
+    // Log server timing if available
+    if (data._timing) {
+      console.log('RollCall server timing:', JSON.stringify(data._timing, null, 2));
+    }
 
     // Fetch available divisions in parallel
     SPM.callServer('getAvailableDivisions').then(function(divData) {
@@ -805,18 +811,17 @@ function showActionModal(index) {
   var btnsHtml = '';
 
   if (status === 'submitted') {
-    // Already registered — show cancel option
-    var regId = team.registrationId || team.djPairId || '';
-    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();cancelReg(\'' + esc(regId) + '\')">Cancel Registration</button>';
+    // Registered → can switch to Not Returning
+    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();doSwitchStatus(' + index + ', \'not_returning\')">Not Returning</button>';
   } else if (status === 'not_returning') {
-    // Already marked not returning — show undo
-    var regId2 = team.registrationId || team.djPairId || '';
-    btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();cancelReg(\'' + esc(regId2) + '\')">Undo Not Returning</button>';
-  } else {
-    // Pending — show all three options
+    // Not Returning → can switch to Registered
     btnsHtml += '<button class="spm-btn spm-btn-primary" onclick="hideActionModal();quickReRegister(' + index + ')">Re-Register (Same Team)</button>';
     btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();startReRegister(' + index + ')">Re-Register with Changes</button>';
-    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();markNotReturning(' + index + ')">Not Returning</button>';
+  } else {
+    // Pending → can go to Registered or Not Returning
+    btnsHtml += '<button class="spm-btn spm-btn-primary" onclick="hideActionModal();quickReRegister(' + index + ')">Re-Register (Same Team)</button>';
+    btnsHtml += '<button class="spm-btn spm-btn-secondary" onclick="hideActionModal();startReRegister(' + index + ')">Re-Register with Changes</button>';
+    btnsHtml += '<button class="spm-btn spm-btn-danger" onclick="hideActionModal();doSwitchStatus(' + index + ', \'not_returning\')">Not Returning</button>';
   }
 
   document.getElementById('actionModalBtns').innerHTML = btnsHtml;
@@ -867,6 +872,7 @@ function quickReRegister(teamIndex) {
     payload.teamName = team.eightBallTeam.teamName || team.baseName;
     payload.hostLocation = team.eightBallTeam.venue || team.nineBallTeam.venue;
     payload.originalTeamNumber = team.eightBallTeam.teamNumber;
+    payload.originalTeamNumber9 = team.nineBallTeam.teamNumber;
 
     // Extract captains from rosters
     var capt8 = '', coCapt8 = '', capt9 = '', coCapt9 = '';
@@ -913,29 +919,7 @@ function quickReRegister(teamIndex) {
   });
 }
 
-// ── Mark Not Returning ─────────────────────────────────────────────
-function markNotReturning(teamIndex) {
-  var team = currentTeams[teamIndex];
-  var name = team.isDjPair ? (team.eightBallTeam.teamName || team.baseName) : team.teamName;
-  var origTeam = team.isDjPair ? team.eightBallTeam.teamNumber : team.teamNumber;
 
-  if (!confirm('Mark "' + name + '" as not returning next session?')) return;
-
-  showLoading('Updating...');
-  SPM.callServer('markNotReturning', {
-    memberNumber: currentPlayer.memberNumber,
-    teamName: name,
-    originalTeamNumber: origTeam,
-    day: team.day
-  }).then(function(data) {
-    hideLoading();
-    if (!data.success) { alert(data.error || 'Failed.'); return; }
-    doLookup();  // Refresh dashboard
-  }).catch(function() {
-    hideLoading();
-    alert('Network error.');
-  });
-}
 
 function buildRosterSummary(roster) {
   var esc = SPM.esc;
@@ -951,17 +935,37 @@ function buildRosterSummary(roster) {
   return html;
 }
 
-// ── Cancel Registration ────────────────────────────────────────────
-function cancelReg(regId) {
-  if (!confirm('Cancel this registration?')) return;
+// ── Switch Status (Registered ↔ Not Returning, or Pending → Not Returning) ──
+function doSwitchStatus(teamIndex, newStatus) {
+  var team = currentTeams[teamIndex];
+  var name = team.isDjPair ? (team.eightBallTeam.teamName || team.baseName) : team.teamName;
 
-  showLoading('Cancelling...');
-  SPM.callServer('cancelRegistration', {
-    registrationId: regId,
-    memberNumber: currentPlayer.memberNumber
-  }).then(function(data) {
+  var label = newStatus === 'not_returning' ? 'Not Returning' : 'Registered';
+  if (!confirm('Mark "' + name + '" as ' + label + '?')) return;
+
+  var payload = {
+    memberNumber: currentPlayer.memberNumber,
+    newStatus: newStatus
+  };
+
+  // If registration already exists, pass its ID
+  if (team.registrationId) {
+    payload.registrationId = team.registrationId;
+  } else {
+    // New entry (Pending → Not Returning)
+    payload.teamName = name;
+    payload.day = team.day;
+    payload.isDjPair = team.isDjPair;
+    payload.originalTeamNumber = team.isDjPair ? team.eightBallTeam.teamNumber : team.teamNumber;
+    if (team.isDjPair) {
+      payload.originalTeamNumber9 = team.nineBallTeam.teamNumber;
+    }
+  }
+
+  showLoading('Updating...');
+  SPM.callServer('switchStatus', payload).then(function(data) {
     hideLoading();
-    if (!data.success) { alert(data.error || 'Cancel failed.'); return; }
+    if (!data.success) { alert(data.error || 'Failed.'); return; }
     doLookup();
   }).catch(function() {
     hideLoading();
@@ -977,6 +981,7 @@ function startReRegister(teamIndex) {
 
   if (team.isDjPair) {
     currentFormOrigTeam = team.eightBallTeam.teamNumber;
+    currentFormOrigTeam9 = team.nineBallTeam.teamNumber;
     currentFormIsDj = true;
     // Pre-fill rosters from current team data
     currentRoster8 = team.eightBallTeam.roster.map(function(p) {
@@ -995,6 +1000,7 @@ function startReRegister(teamIndex) {
     });
   } else {
     currentFormOrigTeam = team.teamNumber;
+    currentFormOrigTeam9 = '';
     currentFormIsDj = false;
     currentRoster = team.roster.map(function(p) {
       return { memberNumber: p.memberNumber, playerName: p.playerName, role: p.role || 'Player', manualEntry: false };
@@ -1017,6 +1023,7 @@ function showNewTeamForm() {
   currentFormIsReReg = false;
   currentFormIsDj = false;
   currentFormOrigTeam = '';
+  currentFormOrigTeam9 = '';
   currentRoster = [];
   currentRoster8 = [];
   currentRoster9 = [];
@@ -1387,6 +1394,7 @@ function submitRegistration() {
     hostLocation: hostLocation,
     isReRegistration: currentFormIsReReg,
     originalTeamNumber: currentFormOrigTeam,
+    originalTeamNumber9: currentFormOrigTeam9,
     isDjPair: currentFormIsDj,
     registeredBy: currentPlayer.memberNumber
   };
